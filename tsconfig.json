@@ -18,7 +18,7 @@
     "noEmitOnError": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "verbatimModuleSyntax": true, 
+    "verbatimModuleSyntax": true,
 
     // Type safety
     "strict": true,
@@ -27,5 +27,5 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["src", "prisma"],
-  "exclude": ["node_modules", "dist", "examples",]
+  "exclude": ["node_modules", "dist", "examples"]
 }

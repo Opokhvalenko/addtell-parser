@@ -9,8 +9,11 @@
     "build": "tsc -p tsconfig.json && prisma generate",
     "start": "node dist/server.js",
     "lint": "biome check .",
-    "lint:fix": "biome check --apply .",
-    "prisma:generate": "prisma generate"
+    "lint:fix": "biome check --write .",
+    "fmt": "biome format .",
+    "fmt:fix": "biome format --write .",
+    "prisma:generate": "prisma generate",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -43,11 +46,18 @@
     "@biomejs/biome": "^2.2.4",
     "@types/node": "^24.5.2",
     "concurrently": "^9.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
     "nodemon": "^3.1.10",
     "prisma": "^6.16.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.2"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,md,yml,yaml}": [
+      "biome check --apply --unsafe"
+    ]
   }
 }
