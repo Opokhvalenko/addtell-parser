@@ -7,7 +7,8 @@ const feedRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/feed", async (req, reply) => {
     const parsed = Query.safeParse(req.query);
-    if (!parsed.success) return reply.code(400).send({ error: "Bad Request", details: parsed.error.errors });
+    if (!parsed.success)
+      return reply.code(400).send({ error: "Bad Request", details: parsed.error.errors });
 
     const url = parsed.data.url ?? process.env.DEFAULT_FEED_URL;
     if (!url) return reply.code(400).send({ error: "DEFAULT_FEED_URL is not set" });
