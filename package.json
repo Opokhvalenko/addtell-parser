@@ -57,7 +57,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md,yml,yaml}": [
-      "biome check --apply --unsafe"
+      "biome check --write"
     ]
   }
 }
