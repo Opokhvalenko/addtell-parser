@@ -1,4 +1,8 @@
-generator client { provider = "prisma-client-js" }
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "mongodb"
@@ -6,25 +10,25 @@ datasource db {
 }
 
 model Feed {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  url       String    @unique
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  url       String     @unique
   title     String?
   items     FeedItem[]
-  updatedAt DateTime  @updatedAt
-  createdAt DateTime  @default(now())
+  updatedAt DateTime   @updatedAt
+  createdAt DateTime   @default(now())
 }
 
 model FeedItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  feedId    String   @db.ObjectId
-  feed      Feed     @relation(fields: [feedId], references: [id])
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  feedId    String    @db.ObjectId
+  feed      Feed      @relation(fields: [feedId], references: [id])
   guid      String?
   link      String
   title     String?
   content   String?
   pubDate   DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  @@index([feedId])
   @@unique([feedId, link])
+  @@index([feedId])
 }
