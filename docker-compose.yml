@@ -2,34 +2,37 @@ services:
   mongo:
     image: mongo:7
     container_name: mongo
-    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: root
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      - type: volume
+        source: mongo_data
+        target: /data/db
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' -u root -p root --authenticationDatabase admin | grep 1 || exit 1"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 60
+      start_period: 20s
 
   backend:
     build: .
     container_name: backend
-    restart: unless-stopped
     depends_on:
       mongo:
         condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: "3000"
-      DATABASE_URL: "mongodb://root:root@mongo:27017/feeds?authSource=admin"
+      HOST: "0.0.0.0"
+      DATABASE_URL: "mongodb://root:root@mongo:27017/feeds?authSource=admin&replicaSet=rs0"
       DEFAULT_FEED_URL: "https://hnrss.org/frontpage"
     ports:
       - "3000:3000"
 
 volumes:
-  mongo_data:
+  mongo_data: {}
