@@ -1,10 +1,10 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad from "@fastify/autoload";
-import Fastify, { type FastifyError, type FastifyServerOptions } from "fastify";
+import Fastify, { type FastifyServerOptions } from "fastify";
+import configPlugin from "./config/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
 export type AppOptions = Partial<FastifyServerOptions>;
 
 async function buildApp(options: AppOptions = {}) {
@@ -19,27 +19,13 @@ async function buildApp(options: AppOptions = {}) {
       : true,
   });
 
-  // Глобальний error handler (без any)
-  fastify.setErrorHandler((err: FastifyError, _req, reply) => {
-    const status = typeof err.statusCode === "number" ? err.statusCode : 500;
-    reply.code(status).send({ error: err.name, message: err.message });
-  });
+  await fastify.register(configPlugin);
 
-  // Автолоад плагінів
-  await fastify.register(AutoLoad, {
-    dir: join(__dirname, "plugins"),
-    options,
-  });
+  await fastify.register(AutoLoad, { dir: join(__dirname, "plugins"), options });
 
-  // Автолоад роутів
-  await fastify.register(AutoLoad, {
-    dir: join(__dirname, "routes"),
-    options,
-  });
+  await fastify.register(AutoLoad, { dir: join(__dirname, "routes"), options });
 
-  // Проста перевірка
   fastify.get("/", async () => ({ hello: "world" }));
-
   return fastify;
 }
 
