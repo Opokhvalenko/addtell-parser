@@ -1,29 +1,29 @@
-FROM node:20-bookworm-slim AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-
-COPY package.json package-lock.json ./
+# deps
+COPY package*.json ./
 RUN npm ci
 
+# код і конфіги
+COPY tsconfig.json ./
 COPY prisma ./prisma
-RUN npx prisma generate
+COPY src ./src
 
-COPY . .
+# згенерувати клієнт і зібрати TS
 RUN npm run build
 
-FROM node:20-bookworm-slim AS runtime
+# ===== runner =====
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Потрібен openssl для prisma engines
+RUN apk add --no-cache openssl
 
 COPY --from=builder /app/node_modules ./node_modules
-
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-COPY package.json ./
 
 EXPOSE 3000
-CMD ["node", "dist/server.js"]
+CMD ["node","dist/index.js"]
