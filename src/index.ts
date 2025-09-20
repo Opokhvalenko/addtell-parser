@@ -1,20 +1,32 @@
 import buildApp from "./app.js";
 
 async function start() {
-  const fastify = await buildApp({
-    logger: true,
-  });
+  const app = await buildApp();
 
-  const port = fastify.config.PORT;
-  const host = fastify.config.HOST;
+  const port = app.config.PORT ?? 3000;
+  const host = app.config.HOST ?? "0.0.0.0";
 
-  fastify.listen({ port, host }, (err, address) => {
-    if (err) {
-      console.log(err);
+  try {
+    const address = await app.listen({ port, host });
+    app.log.info({ address }, "server started");
+  } catch (err) {
+    app.log.error(err, "failed to start server");
+    process.exit(1);
+  }
+
+  const close = async (sig: string) => {
+    try {
+      app.log.info({ sig }, "shutting down");
+      await app.close();
+      process.exit(0);
+    } catch (e) {
+      app.log.error(e, "error during shutdown");
       process.exit(1);
     }
-    console.log(`Server running at ${address}`);
-  });
+  };
+
+  process.on("SIGINT", () => close("SIGINT"));
+  process.on("SIGTERM", () => close("SIGTERM"));
 }
 
 void start();

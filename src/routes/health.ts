@@ -4,7 +4,6 @@ const health: FastifyPluginAsync = async (fastify) => {
   fastify.get("/health/server", async () => ({ status: "ok" }));
   fastify.get("/health/db", async (req, reply) => {
     try {
-      // @ts-expect-error Mongo only
       const res = await fastify.prisma.$runCommandRaw({ ping: 1 });
       return { status: res?.ok === 1 ? "ok" : "unknown" };
     } catch (e) {
