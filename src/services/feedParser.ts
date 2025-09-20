@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import Parser from "rss-parser";
+import { normalizeError } from "../utils/errors.js";
 
 export type RssItem = {
   link: string;
@@ -29,9 +30,10 @@ export async function parseFeed(fastify: FastifyInstance, url: string) {
     const count = Array.isArray(feed.items) ? feed.items.length : 0;
     fastify.log.info({ url, items: count, ms, mode: "parseURL" }, "parseFeed: done");
     return feed;
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const e = normalizeError(err);
     fastify.log.warn(
-      { url, errName: err?.name, errMsg: err?.message },
+      { url, errName: e.name, errMsg: e.message },
       "parseFeed: parseURL failed, trying fetch+parseString",
     );
   }
@@ -59,9 +61,10 @@ export async function parseFeed(fastify: FastifyInstance, url: string) {
     const count = Array.isArray(feed.items) ? feed.items.length : 0;
     fastify.log.info({ url, items: count, ms, mode: "parseString" }, "parseFeed: done");
     return feed;
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const e = normalizeError(err);
     fastify.log.error(
-      { url, errName: err?.name, errMsg: err?.message },
+      { url, errName: e.name, errMsg: e.message },
       "parseFeed: failed on fetch+parseString",
     );
     throw err;

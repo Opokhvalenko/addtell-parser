@@ -1,12 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { withRetry } from "../utils/retry.js";
+import type { RssItem } from "./feedParser.js";
 import { parseFeed } from "./feedParser.js";
 
 type InputItem = {
   link: string;
   title?: string;
   content?: string;
-  pubDate?: string | Date; 
+  pubDate?: string | Date;
   guid?: string;
 };
 
@@ -17,6 +18,8 @@ type FeedItemCreate = {
   pubDate?: Date | null;
   guid?: string | null;
 };
+
+type RssItemMaybeEncoded = RssItem & { "content:encoded"?: string };
 
 function toCreateInput(i: InputItem): FeedItemCreate {
   return {
@@ -29,9 +32,9 @@ function toCreateInput(i: InputItem): FeedItemCreate {
 }
 
 /**
- * @param app Fastify instance 
+ * @param app Fastify instance
  * @param url URL RSS/Atom
- * @param force 
+ * @param force
  */
 export async function getOrParseFeed(app: FastifyInstance, url: string, force = false) {
   const existing = await app.prisma.feed.findUnique({
@@ -46,14 +49,18 @@ export async function getOrParseFeed(app: FastifyInstance, url: string, force = 
 
   const raw = await withRetry(() => parseFeed(app, url), 3, 700);
 
-  const parsedItems: InputItem[] = (raw.items ?? [])
-    .map((i: any) => ({
-      link: i.link ?? "",
-      title: i.title ?? undefined,
-      content: i["content:encoded"] || i.content || undefined,
-      pubDate: i.pubDate ?? undefined,
-      guid: i.guid ?? undefined,
-    }))
+  const items = (raw.items ?? []) as RssItemMaybeEncoded[];
+  const parsedItems: InputItem[] = items
+    .map((i) => {
+      const out: InputItem = { link: i.link ?? "" };
+      if (i.title != null) out.title = i.title;
+      const encoded = i["content:encoded"];
+      if (encoded != null) out.content = encoded;
+      else if (i.content != null) out.content = i.content;
+      if (i.pubDate != null) out.pubDate = i.pubDate;
+      if (i.guid != null) out.guid = i.guid;
+      return out;
+    })
     .filter((i) => i.link);
 
   app.log.info({ url, title: raw.title, count: parsedItems.length }, "feed: parsed");
@@ -62,16 +69,12 @@ export async function getOrParseFeed(app: FastifyInstance, url: string, force = 
     where: { url },
     update: {
       title: raw.title ?? null,
-      items: {
-        create: parsedItems.map(toCreateInput),
-      },
+      items: { create: parsedItems.map(toCreateInput) },
     },
     create: {
       url,
       title: raw.title ?? null,
-      items: {
-        create: parsedItems.map(toCreateInput),
-      },
+      items: { create: parsedItems.map(toCreateInput) },
     },
   });
 
