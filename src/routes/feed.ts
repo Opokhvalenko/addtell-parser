@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { getOrParseFeed } from "../services/feedService.js";
+import { normalizeError } from "../utils/errors.js";
 
 const feedRoutes: FastifyPluginAsync = async (fastify) => {
   const Query = z.object({
@@ -32,11 +33,10 @@ const feedRoutes: FastifyPluginAsync = async (fastify) => {
       const data = await getOrParseFeed(fastify, url, force);
       fastify.log.info({ url, items: data.items?.length ?? 0 }, "GET /feed: ok");
       return { url, ...data };
-    } catch (e: any) {
-      fastify.log.error({ url, errName: e?.name, errMsg: e?.message }, "GET /feed: failed");
-      return reply
-        .code(502)
-        .send({ error: "Failed to fetch feed", message: String(e?.message ?? e) });
+    } catch (e: unknown) {
+      const err = normalizeError(e);
+      fastify.log.error({ url, errName: err.name, errMsg: err.message }, "GET /feed: failed");
+      return reply.code(502).send({ error: "Failed to fetch feed", message: err.message });
     }
   });
 };
