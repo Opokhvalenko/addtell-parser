@@ -3,31 +3,24 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc -p tsconfig.json && prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "start:prod": "node --enable-source-maps dist/index.js",
     "lint": "biome check .",
     "lint:fix": "biome check --write src",
     "fmt": "biome format src",
     "fmt:fix": "biome format --write .",
     "prisma:generate": "prisma generate",
-    "prepare": "husky"
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:format": "prisma format",
+    "prepare": "husky install",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Opokhvalenko/addtell-parser.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
-  "bugs": {
-    "url": "https://github.com/Opokhvalenko/addtell-parser/issues"
-  },
-  "homepage": "https://github.com/Opokhvalenko/addtell-parser#readme",
   "dependencies": {
+    "@fastify/ajv-compiler": "^4.0.2",
     "@fastify/autoload": "^6.3.1",
     "@fastify/env": "^5.0.2",
     "@fastify/sensible": "^6.0.3",
@@ -41,8 +34,7 @@
     "fastify-plugin": "^5.0.1",
     "pino": "^9.10.0",
     "pino-pretty": "^13.1.1",
-    "rss-parser": "^3.13.0",
-    "zod": "^4.1.9"
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",
