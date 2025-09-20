@@ -7,10 +7,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc -p tsconfig.json && prisma generate",
-    "start": "node dist/server.js",
+    "start": "node dist/index.js",
     "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "fmt": "biome format .",
+    "lint:fix": "biome check --write src",
+    "fmt": "biome format src",
     "fmt:fix": "biome format --write .",
     "prisma:generate": "prisma generate",
     "prepare": "husky"

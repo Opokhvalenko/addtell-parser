@@ -30,11 +30,7 @@ function toCreateInput(i: ParsedItem): FeedItemCreate {
   };
 }
 
-export async function getOrParseFeed(
-  app: FastifyInstance,
-  url: string,
-  force = false,
-) {
+export async function getOrParseFeed(app: FastifyInstance, url: string, force = false) {
   const existing = await app.prisma.feed.findUnique({
     where: { url },
     include: { items: true },
