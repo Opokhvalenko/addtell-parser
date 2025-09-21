@@ -1,10 +1,36 @@
-version: "3.9"
-
 services:
+  mongo-keyfile:
+    image: alpine:3.20
+    container_name: mongo-keyfile
+    command: >
+      sh -lc '
+        set -e;
+        mkdir -p /data/config;
+        if [ ! -f /data/config/keyfile ]; then
+          # можна без openssl: достатньо випадкових байтів
+          head -c 756 /dev/urandom | base64 > /data/config/keyfile;
+        fi;
+        chmod 600 /data/config/keyfile;
+        # користувач "mongodb" у офіційному образі має uid 999
+        chown -R 999:999 /data/config
+      '
+    volumes:
+      - mongo_data:/data
+    restart: "no"
+
   mongo:
     image: mongo:7
     container_name: mongo
-    restart: unless-stopped
+    depends_on:
+      mongo-keyfile:
+        condition: service_completed_successfully
+    command:
+      [
+        "mongod",
+        "--replSet", "rs0",
+        "--bind_ip_all",
+        "--keyFile", "/data/config/keyfile"
+      ]
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: root
@@ -12,29 +38,52 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+      - mongo_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --eval 'db.runCommand({ ping: 1 })' -u root -p root --authenticationDatabase admin || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' -u root -p root --authenticationDatabase admin | grep 1 || exit 1"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 60
+      start_period: 20s
 
-  backend:
-    build: .
-    container_name: backend
-    restart: unless-stopped
+  mongo-setup:
+    image: mongo:7
+    container_name: mongo-setup
     depends_on:
       mongo:
         condition: service_healthy
+    restart: "no"
+    entrypoint:
+      - bash
+      - -lc
+      - |
+        set -e
+        echo "Ensuring replica set is initiated..."
+        mongosh --quiet --host mongo -u root -p root --authenticationDatabase admin --eval '
+          try {
+            const s = rs.status();
+            print("Replica set already exists:", s.set);
+          } catch (e) {
+            print("Replica set not initiated, initiating...");
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] });
+          }
+        '
+  backend:
+    build: .
+    container_name: backend
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mongo-setup:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       PORT: "3000"
-      DATABASE_URL: "mongodb://root:root@mongo:27017/feeds?authSource=admin"
+      HOST: "0.0.0.0"
+      DATABASE_URL: "mongodb://root:root@mongo:27017/feeds?authSource=admin&replicaSet=rs0"
       DEFAULT_FEED_URL: "https://hnrss.org/frontpage"
     ports:
       - "3000:3000"
-    #  .env:
-    # env_file:
-    #   - .env
 
 volumes:
   mongo_data:
