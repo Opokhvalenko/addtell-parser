@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import Parser from "rss-parser";
-import { normalizeError } from "../utils/errors.js";
+import { normalizeError } from "../utils/index.js";
 
 export type RssItem = {
   link: string;

@@ -7,9 +7,7 @@ import {
   QuerySchema,
 } from "../schemas/feed.js";
 import { getOrParseFeed } from "../services/feedService.js";
-import { normalizeError } from "../utils/errors.js";
-
-const toStr = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
+import { normalizeError, toStr } from "../utils/index.js";
 
 const normalizeItem = (i: unknown): FeedItemResponse => {
   const o = (i ?? {}) as Record<string, unknown>;
