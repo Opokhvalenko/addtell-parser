@@ -27,6 +27,6 @@
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "prisma"],
+  "include": ["src", "prisma", "types/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "examples"]
 }

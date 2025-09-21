@@ -1,12 +1,9 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad from "@fastify/autoload";
-import Sensible from "@fastify/sensible";
 import Fastify, { type FastifyServerOptions } from "fastify";
 
 import configPlugin from "./config/index.js";
-import { ajvFormatsPlugin } from "./lib/ajvFormatsPlugin.js";
-import errorHandlerPlugin from "./plugins/error-handler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export type AppOptions = Partial<FastifyServerOptions>;
@@ -15,6 +12,7 @@ async function buildApp(options: AppOptions = {}) {
   const isDev = process.env.NODE_ENV !== "production";
 
   const fastify = Fastify({
+    ...options,
     logger: isDev
       ? {
           level: "info",
@@ -25,32 +23,29 @@ async function buildApp(options: AppOptions = {}) {
         }
       : { level: "info" },
 
+    disableRequestLogging: isDev,
+
     ajv: {
       customOptions: {
         allErrors: true,
         coerceTypes: true,
         removeAdditional: true,
       },
-      plugins: [ajvFormatsPlugin],
     },
-
-    ...options,
   });
 
   await fastify.register(configPlugin);
-  await fastify.register(Sensible);
-  await fastify.register(errorHandlerPlugin);
 
   await fastify.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     encapsulate: false,
-    ignorePattern: /(^_|\.d\.ts$)/i,
+    ignorePattern: /(^_|\.d\.ts$|\.test\.ts$)/i,
   });
 
   await fastify.register(AutoLoad, {
     dir: join(__dirname, "routes"),
     encapsulate: false,
-    ignorePattern: /(^_|\.d\.ts$)/i,
+    ignorePattern: /(^_|\.d\.ts$|\.test\.ts$)/i,
     routeParams: true,
     maxDepth: 2,
   });
