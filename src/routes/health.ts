@@ -1,16 +1,25 @@
 import type { FastifyPluginAsync } from "fastify";
 
-const health: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/health/server", async () => ({ status: "ok" }));
-  fastify.get("/health/db", async (req, reply) => {
-    try {
-      // @ts-expect-error Mongo only
-      const res = await fastify.prisma.$runCommandRaw({ ping: 1 });
-      return { status: res?.ok === 1 ? "ok" : "unknown" };
-    } catch (e) {
-      req.log.error(e);
-      return reply.code(503).send({ status: "error", message: "db unavailable" });
-    }
-  });
+const healthRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get(
+    "/health",
+    {
+      schema: {
+        summary: "Service health",
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              status: { type: "string", const: "ok" },
+            },
+            required: ["status"],
+            additionalProperties: false,
+          } as const,
+        },
+      },
+    },
+    async () => ({ status: "ok" }),
+  );
 };
-export default health;
+
+export default healthRoutes;
