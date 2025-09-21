@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { withRetry } from "../utils/retry.js";
+import { withRetry } from "../utils/index.js";
 import type { RssItem } from "./feedParser.js";
 import { parseFeed } from "./feedParser.js";
 
