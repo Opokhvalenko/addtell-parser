@@ -9,6 +9,27 @@ import {
 import { getOrParseFeed } from "../services/feedService.js";
 import { normalizeError } from "../utils/errors.js";
 
+const toStr = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
+
+const normalizeItem = (i: unknown): FeedItemResponse => {
+  const o = (i ?? {}) as Record<string, unknown>;
+
+  const base = {
+    id: toStr(o.id),
+    feedId: toStr(o.feedId),
+    title: toStr(o.title),
+    link: toStr(o.link),
+    pubDate: toStr(o.pubDate),
+    createdAt: toStr(o.createdAt),
+  };
+
+  return {
+    ...base,
+    ...(typeof o.guid === "string" ? { guid: o.guid } : {}),
+    ...(typeof o.content === "string" ? { content: o.content } : {}),
+  };
+};
+
 const feedRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{
     Querystring: Query;
@@ -18,9 +39,7 @@ const feedRoutes: FastifyPluginAsync = async (fastify) => {
     {
       schema: {
         querystring: QuerySchema,
-        response: {
-          200: FeedResponseSchema,
-        },
+        response: { 200: FeedResponseSchema },
       },
     },
     async (req, reply) => {
@@ -36,50 +55,27 @@ const feedRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const data = await getOrParseFeed(fastify, url, force);
 
-        const title: string | undefined =
-          data && typeof data === "object" && "title" in (data as object)
-            ? typeof (data as { title?: unknown }).title === "string"
-              ? (data as { title?: string }).title
-              : undefined
+        const title =
+          data && typeof (data as { title?: unknown }).title === "string"
+            ? (data as { title?: string }).title
             : undefined;
-        const rawItems: unknown[] =
-          data && typeof data === "object" && "items" in (data as object)
-            ? Array.isArray((data as { items?: unknown }).items)
-              ? ((data as { items?: unknown[] }).items as unknown[])
-              : []
+
+        const rawItems =
+          data && Array.isArray((data as { items?: unknown }).items)
+            ? ((data as { items?: unknown[] }).items as unknown[])
             : [];
 
-        const toStr = (v: unknown): string =>
-          typeof v === "string" ? v : v == null ? "" : String(v);
-
-        const normalizeItem = (i: unknown): FeedItemResponse => {
-          const o = (i ?? {}) as Record<string, unknown>;
-
-          const base = {
-            id: toStr(o.id),
-            feedId: toStr(o.feedId),
-            title: toStr(o.title),
-            link: toStr(o.link),
-            pubDate: toStr(o.pubDate),
-            createdAt: toStr(o.createdAt),
-          };
-
-          return {
-            ...base,
-            ...(typeof o.guid === "string" ? { guid: o.guid } : {}),
-            ...(typeof o.content === "string" ? { content: o.content } : {}),
-          };
-        };
-
         const items: FeedResponse["items"] = rawItems.map(normalizeItem);
+
         const body: FeedResponse = { url, items };
-        if (typeof title === "string") body.title = title;
+        if (title) body.title = title;
 
         fastify.log.info({ url, items: items.length }, "GET /feed: ok");
         return body;
       } catch (e: unknown) {
         const err = normalizeError(e);
         fastify.log.error({ url, errName: err.name, errMsg: err.message }, "GET /feed: failed");
+
         return reply
           .code(502)
           .send({ url, items: [], title: "Failed to fetch feed" } satisfies FeedResponse);
