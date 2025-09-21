@@ -6,17 +6,18 @@
   "type": "module",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "prisma generate && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:format": "prisma format",
     "start": "node dist/index.js",
     "start:prod": "node --enable-source-maps dist/index.js",
     "lint": "biome check .",
     "lint:fix": "biome check --write src",
     "fmt": "biome format src",
     "fmt:fix": "biome format --write .",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:format": "prisma format",
-    "prepare": "husky install",
+    "prepare": "husky",
+    "prepush:checks": "npm run lint && npm run prisma:generate && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
