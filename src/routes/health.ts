@@ -1,3 +1,4 @@
+//src/routes/health.ts
 import type { FastifyPluginAsync } from "fastify";
 
 const healthRoutes: FastifyPluginAsync = async (fastify) => {

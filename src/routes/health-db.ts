@@ -1,3 +1,4 @@
+//src/routes/health-db.ts
 import type { FastifyPluginAsync } from "fastify";
 
 function hasRunCommandRaw(

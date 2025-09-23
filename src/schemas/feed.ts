@@ -1,3 +1,4 @@
+//src/schemas/feed.ts
 import type { FromSchema } from "json-schema-to-ts";
 
 export const QuerySchema = {

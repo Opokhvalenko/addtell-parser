@@ -1,18 +1,15 @@
 services:
   mongo-keyfile:
     image: alpine:3.20
-    container_name: mongo-keyfile
     command: >
       sh -lc '
         set -e;
         mkdir -p /data/config;
         if [ ! -f /data/config/keyfile ]; then
-          # можна без openssl: достатньо випадкових байтів
           head -c 756 /dev/urandom | base64 > /data/config/keyfile;
         fi;
         chmod 600 /data/config/keyfile;
-        # користувач "mongodb" у офіційному образі має uid 999
-        chown -R 999:999 /data/config
+        chown -R 999:999 /data
       '
     volumes:
       - mongo_data:/data
@@ -20,22 +17,16 @@ services:
 
   mongo:
     image: mongo:7
-    container_name: mongo
     depends_on:
       mongo-keyfile:
         condition: service_completed_successfully
     command:
-      [
-        "mongod",
-        "--replSet", "rs0",
-        "--bind_ip_all",
-        "--keyFile", "/data/config/keyfile"
-      ]
+      [ "mongod", "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/config/keyfile" ]
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: root
     ports:
-      - "27017:27017"
+      - "27017:27017" 
     volumes:
       - mongo_data:/data/db
       - mongo_data:/data
@@ -48,7 +39,6 @@ services:
 
   mongo-setup:
     image: mongo:7
-    container_name: mongo-setup
     depends_on:
       mongo:
         condition: service_healthy
@@ -60,14 +50,11 @@ services:
         set -e
         echo "Ensuring replica set is initiated..."
         mongosh --quiet --host mongo -u root -p root --authenticationDatabase admin --eval '
-          try {
-            const s = rs.status();
-            print("Replica set already exists:", s.set);
-          } catch (e) {
-            print("Replica set not initiated, initiating...");
-            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] });
-          }
+          try { const s = rs.status(); print("Replica set already exists:", s.set); }
+          catch (e) { print("Replica set not initiated, initiating...");
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] }); }
         '
+
   backend:
     build: .
     container_name: backend
@@ -82,6 +69,7 @@ services:
       HOST: "0.0.0.0"
       DATABASE_URL: "mongodb://root:root@mongo:27017/feeds?authSource=admin&replicaSet=rs0"
       DEFAULT_FEED_URL: "https://hnrss.org/frontpage"
+      JWT_SECRET: "this_is_a_demo_secret_change_me_32+_chars_long"
     ports:
       - "3000:3000"
 

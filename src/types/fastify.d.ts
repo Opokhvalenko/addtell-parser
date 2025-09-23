@@ -5,6 +5,7 @@ declare module "fastify" {
   interface FastifyInstance {
     config: Config;
     prisma: PrismaClient;
+
     pluginLoaded: (pluginName: string) => void;
   }
 }

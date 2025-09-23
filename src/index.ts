@@ -1,7 +1,8 @@
+import type { FastifyInstance } from "fastify";
 import buildApp from "./app.js";
 
-async function start() {
-  const app = await buildApp();
+async function start(): Promise<void> {
+  const app: FastifyInstance = await buildApp();
 
   const port = app.config.PORT ?? 3000;
   const host = app.config.HOST ?? "0.0.0.0";

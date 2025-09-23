@@ -1,3 +1,4 @@
+//src/ulils/errors.ts
 export type NormalizedError = {
   message: string;
   name?: string;
