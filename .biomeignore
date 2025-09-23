@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/**
 .husky/**
 .github/**
@@ -8,4 +8,4 @@ dist/**
 .env.*
 coverage/
 **/*.tsbuildinfo
-prisma/generated/
+prisma/generated

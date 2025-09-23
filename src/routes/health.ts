@@ -1,23 +1,10 @@
 import type { FastifyPluginAsync } from "fastify";
+import { OkSchema } from "../schemas/health.js";
 
 const healthRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/health",
-    {
-      schema: {
-        summary: "Service health",
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              status: { type: "string", const: "ok" },
-            },
-            required: ["status"],
-            additionalProperties: false,
-          } as const,
-        },
-      },
-    },
+    { schema: { summary: "Service health", response: { 200: OkSchema } } },
     async () => ({ status: "ok" }),
   );
 };
