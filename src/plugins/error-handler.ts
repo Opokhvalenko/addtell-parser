@@ -1,3 +1,4 @@
+//src/plugins/error-handler.ts
 import type { FastifyError, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 

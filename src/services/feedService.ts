@@ -1,5 +1,6 @@
+//src/services/feedService.ts
 import type { FastifyInstance } from "fastify";
-import { withRetry } from "../utils/index.js";
+import { withRetry } from "../utils/retry.js";
 import type { RssItem } from "./feedParser.js";
 import { parseFeed } from "./feedParser.js";
 
@@ -11,7 +12,7 @@ type InputItem = {
   guid?: string;
 };
 
-type FeedItemCreate = {
+type FeedItemCreateCore = {
   link: string;
   title?: string | null;
   content?: string | null;
@@ -21,7 +22,7 @@ type FeedItemCreate = {
 
 type RssItemMaybeEncoded = RssItem & { "content:encoded"?: string };
 
-function toCreateInput(i: InputItem): FeedItemCreate {
+function toCreateCore(i: InputItem): FeedItemCreateCore {
   return {
     link: i.link,
     title: i.title ?? null,
@@ -47,41 +48,67 @@ export async function getOrParseFeed(app: FastifyInstance, url: string, force = 
     return { title: existing.title, items: existing.items };
   }
 
-  const raw = await withRetry(() => parseFeed(app, url), 3, 700);
+  try {
+    const raw = await withRetry(() => parseFeed(app, url), 3, 700);
 
-  const items = (raw.items ?? []) as RssItemMaybeEncoded[];
-  const parsedItems: InputItem[] = items
-    .map((i) => {
-      const out: InputItem = { link: i.link ?? "" };
-      if (i.title != null) out.title = i.title;
-      const encoded = i["content:encoded"];
-      if (encoded != null) out.content = encoded;
-      else if (i.content != null) out.content = i.content;
-      if (i.pubDate != null) out.pubDate = i.pubDate;
-      if (i.guid != null) out.guid = i.guid;
-      return out;
-    })
-    .filter((i) => i.link);
+    const items = (raw.items ?? []) as RssItemMaybeEncoded[];
+    const parsedItems: InputItem[] = items
+      .map((i) => {
+        const out: InputItem = { link: i.link ?? "" };
+        if (!out.link) return out;
+        if (i.title != null) out.title = i.title;
+        const encoded = i["content:encoded"];
+        if (encoded != null) out.content = encoded;
+        else if (i.content != null) out.content = i.content;
+        if (i.pubDate != null) out.pubDate = i.pubDate;
+        if (i.guid != null) out.guid = i.guid;
+        return out;
+      })
+      .filter((i) => i.link);
 
-  app.log.info({ url, title: raw.title, count: parsedItems.length }, "feed: parsed");
+    app.log.info({ url, title: raw.title, count: parsedItems.length }, "feed: parsed");
 
-  await app.prisma.feed.upsert({
-    where: { url },
-    update: {
-      title: raw.title ?? null,
-      items: { create: parsedItems.map(toCreateInput) },
-    },
-    create: {
-      url,
-      title: raw.title ?? null,
-      items: { create: parsedItems.map(toCreateInput) },
-    },
-  });
+    const feed = await app.prisma.feed.upsert({
+      where: { url },
+      update: { title: raw.title ?? null },
+      create: { url, title: raw.title ?? null },
+    });
 
-  const fresh = await app.prisma.feed.findUnique({
-    where: { url },
-    include: { items: true },
-  });
+    const data = parsedItems.map((i) => ({
+      ...toCreateCore(i),
+      feedId: feed.id,
+    }));
 
-  return { title: fresh?.title ?? null, items: fresh?.items ?? [] };
+    await Promise.allSettled(
+      data.map((d) =>
+        app.prisma.feedItem.upsert({
+          where: { feedId_link: { feedId: d.feedId as string, link: d.link } },
+          update: {
+            ...(d.title !== undefined ? { title: d.title } : {}),
+            ...(d.content !== undefined ? { content: d.content } : {}),
+            ...(d.pubDate !== undefined ? { pubDate: d.pubDate } : {}),
+            ...(d.guid !== undefined ? { guid: d.guid } : {}),
+          },
+          create: d,
+        }),
+      ),
+    );
+
+    const fresh = await app.prisma.feed.findUnique({
+      where: { url },
+      include: { items: true },
+    });
+
+    return { title: fresh?.title ?? null, items: fresh?.items ?? [] };
+  } catch (err) {
+    if (existing) {
+      app.log.warn(
+        { url, cachedItems: existing.items.length, err: (err as Error).message },
+        "feed: parse failed, returning cached",
+      );
+      return { title: existing.title, items: existing.items };
+    }
+    app.log.error({ url, err: (err as Error).message }, "feed: parse failed and no cache");
+    throw err;
+  }
 }

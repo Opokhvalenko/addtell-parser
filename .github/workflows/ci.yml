@@ -6,7 +6,6 @@ on:
   push:
     branches: [ "main" ]
 
-# щоб нові пуші в той самий PR/гілку скасовували попередній запуск
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -28,7 +27,7 @@ jobs:
         run: npm ci
 
       - name: Biome check
-        run: npm run lint   # biome v2: 'biome check .'
+        run: npm run lint
 
   build:
     runs-on: ubuntu-latest
@@ -41,14 +40,12 @@ jobs:
         env:
           MONGO_INITDB_ROOT_USERNAME: root
           MONGO_INITDB_ROOT_PASSWORD: root
-        # healthcheck щоб не стартувати, поки Mongo не готовий
         options: >-
           --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })' -u root -p root --authenticationDatabase admin || exit 1"
           --health-interval 10s --health-timeout 5s --health-retries 5
     env:
       NODE_ENV: test
       PORT: "3000"
-      # важливо: у CI підключаємось до localhost (порт сервісу проброшений)
       DATABASE_URL: "mongodb://root:root@localhost:27017/feeds?authSource=admin"
       DEFAULT_FEED_URL: "https://hnrss.org/frontpage"
 
