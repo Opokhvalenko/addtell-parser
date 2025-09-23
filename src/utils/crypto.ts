@@ -1,4 +1,3 @@
-//src/ulils/crypto.ts
 import bcrypt from "bcryptjs";
 
 const ROUNDS = 12;

@@ -1,4 +1,3 @@
-//src/services/feedParser.ts
 import type { FastifyInstance } from "fastify";
 import Parser from "rss-parser";
 import { normalizeError } from "../utils/index.js";

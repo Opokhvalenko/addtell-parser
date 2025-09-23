@@ -1,4 +1,3 @@
-//src/schemas/article.ts
 import type { FromSchema } from "json-schema-to-ts";
 
 export const ArticleQuerySchema = {

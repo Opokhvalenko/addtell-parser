@@ -1,5 +1,3 @@
-//src/services/authServece.ts
-
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import type { FastifyInstance } from "fastify";
 import { hashPassword, verifyPassword } from "../utils/crypto.js";
