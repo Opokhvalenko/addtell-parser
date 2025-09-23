@@ -1,4 +1,3 @@
-// src/app.ts
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad from "@fastify/autoload";
@@ -24,20 +23,16 @@ export default async function buildApp(options: AppOptions = {}): Promise<Fastif
         }
       : { level: "info" },
     disableRequestLogging: isDev,
-    // УВАГА: не чіпаємо тут ajv.customOptions — усе робить configPlugin
   });
 
-  // 1) ENV + ajv-formats усередині конфіг-плагіна
   await fastify.register(configPlugin);
 
-  // 2) Plugins (prisma, jwt, swagger, sensible, loaded-marker...)
   await fastify.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     encapsulate: false,
     ignorePattern: /(^_|\.d\.ts$|\.test\.ts$)/i,
   });
 
-  // 3) Routes
   await fastify.register(AutoLoad, {
     dir: join(__dirname, "routes"),
     encapsulate: false,

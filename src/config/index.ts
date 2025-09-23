@@ -1,4 +1,3 @@
-//src/config/index.ts
 import fastifyEnv from "@fastify/env";
 import type { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
