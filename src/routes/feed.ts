@@ -29,10 +29,7 @@ const normalizeItem = (i: unknown): FeedItemResponse => {
 };
 
 const feedRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{
-    Querystring: Query;
-    Reply: FeedResponse;
-  }>(
+  fastify.get<{ Querystring: Query; Reply: FeedResponse }>(
     "/feed",
     {
       schema: {
@@ -44,9 +41,7 @@ const feedRoutes: FastifyPluginAsync = async (fastify) => {
       fastify.log.info({ query: req.query }, "GET /feed: incoming");
 
       const url = req.query.url ?? fastify.config.DEFAULT_FEED_URL;
-      if (!url) {
-        throw fastify.httpErrors.badRequest("DEFAULT_FEED_URL is not set");
-      }
+      if (!url) throw fastify.httpErrors.badRequest("DEFAULT_FEED_URL is not set");
 
       const force = req.query.force === "1";
 

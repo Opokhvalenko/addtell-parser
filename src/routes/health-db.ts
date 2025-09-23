@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { OkSchema } from "../schemas/health.js";
 
 function hasRunCommandRaw(
   client: object,
@@ -12,19 +13,7 @@ const healthDbRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.get(
     "/health/db",
-    {
-      schema: {
-        summary: "DB health",
-        response: {
-          200: {
-            type: "object",
-            properties: { status: { type: "string", const: "ok" } },
-            required: ["status"],
-            additionalProperties: false,
-          } as const,
-        },
-      },
-    },
+    { schema: { summary: "DB health", response: { 200: OkSchema } } },
     async () => {
       try {
         if (hasRunCommandRaw(prisma)) {

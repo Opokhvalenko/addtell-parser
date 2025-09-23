@@ -19,7 +19,6 @@ const articleRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const url = req.query.url;
         const parsed = await withRetry(() => parseArticleByUrl(fastify, url), 2, 400);
-
         return {
           url: parsed.canonicalUrl ?? parsed.url,
           title: parsed.title ?? "",

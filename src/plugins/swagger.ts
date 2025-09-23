@@ -4,8 +4,7 @@ import fp from "fastify-plugin";
 
 export default fp(
   async (fastify) => {
-    const isProd =
-      fastify?.config?.NODE_ENV === "production" || process.env.NODE_ENV === "production";
+    const isProd = fastify.config.NODE_ENV === "production";
 
     await fastify.register(swagger, {
       openapi: {
