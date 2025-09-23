@@ -14,6 +14,18 @@ export type RegisterBody = FromSchema<typeof RegisterBodySchema>;
 export const LoginBodySchema = RegisterBodySchema;
 export type LoginBody = FromSchema<typeof LoginBodySchema>;
 
+export const RegisterResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "email", "createdAt"],
+  properties: {
+    id: { type: "string" },
+    email: { type: "string", format: "email" },
+    createdAt: { type: "string" },
+  },
+} as const;
+export type RegisterResponse = FromSchema<typeof RegisterResponseSchema>;
+
 export const AuthResponseSchema = {
   type: "object",
   required: ["token"],

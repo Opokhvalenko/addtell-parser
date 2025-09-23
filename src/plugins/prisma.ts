@@ -3,8 +3,8 @@ import fp from "fastify-plugin";
 
 export default fp(
   async (fastify) => {
-    const isProd =
-      fastify?.config?.NODE_ENV === "production" || process.env.NODE_ENV === "production";
+    const env = fastify.config?.NODE_ENV ?? "development";
+    const isProd = env === "production";
 
     const prisma = new PrismaClient({
       log: isProd ? ["warn", "error"] : ["query", "info", "warn", "error"],

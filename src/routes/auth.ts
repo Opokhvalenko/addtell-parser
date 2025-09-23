@@ -7,6 +7,7 @@ import {
   MeResponseSchema,
   type RegisterBody,
   RegisterBodySchema,
+  RegisterResponseSchema,
 } from "../schemas/auth.js";
 import { loginUser, registerUser } from "../services/authService.js";
 
@@ -16,18 +17,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     {
       schema: {
         body: RegisterBodySchema,
-        response: {
-          201: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              id: { type: "string" },
-              email: { type: "string", format: "email" },
-              createdAt: { type: "string" },
-            },
-            required: ["id", "email", "createdAt"],
-          } as const,
-        },
+        response: { 201: RegisterResponseSchema },
       },
     },
     async (req, reply) => {
@@ -57,9 +47,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     "/auth/me",
     {
       preHandler: fastify.authenticate,
-      schema: {
-        response: { 200: MeResponseSchema },
-      },
+      schema: { response: { 200: MeResponseSchema } },
     },
     async (req) => req.user as JwtPayload,
   );
