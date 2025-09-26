@@ -14,7 +14,7 @@ try {
   while (attempts < 60) {
     try {
       const st = rs.status();
-      if (st.members && st.members.some(m => m.stateStr === "PRIMARY")) {
+      if (st.members && st.members.some((m) => m.stateStr === "PRIMARY")) {
         print("replica set is PRIMARY");
         break;
       }
