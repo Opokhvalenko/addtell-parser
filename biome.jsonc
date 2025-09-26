@@ -3,6 +3,7 @@
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": {
     "enabled": true,
+    "includes": ["src/**", "prisma/**"],         
     "rules": {
       "recommended": true,
       "style": { "useNodejsImportProtocol": "off", "useImportType": "warn" },
@@ -11,7 +12,7 @@
     }
   },
   "files": {
-    "includes": ["src/**", "prisma/**", "**/*.md"],
+    "includes": ["**", "!node_modules", "!dist", "!coverage"],  
     "ignoreUnknown": true
   }
 }
