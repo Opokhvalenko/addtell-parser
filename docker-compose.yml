@@ -75,6 +75,7 @@ services:
       CRON_TZ: "UTC"
       FEEDS_SOURCES: '["https://hnrss.org/frontpage","https://hnrss.org/newest"]'
       FEEDS_OUT: "public/ads/feeds.json"
+      DEFAULT_FEED_URL: "https://hnrss.org/frontpage"
     ports:
       - "3000:3000"
 
