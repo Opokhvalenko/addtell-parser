@@ -3,8 +3,11 @@ services:
     name: addtell-backend
     env: docker
     dockerfilePath: Dockerfile
-    plan: free
     autoDeploy: true
+
+    envVarGroups:
+      - addtell-backend-prod  
+
     envVars:
       - key: NODE_ENV
         value: production
@@ -12,12 +15,6 @@ services:
         value: 0.0.0.0
       - key: DEFAULT_FEED_URL
         value: https://hnrss.org/frontpage
-      - key: DATABASE_URL
-        fromSecret: ATLAS_DB_URL      
-      - key: JWT_SECRET
-        fromSecret: JWT_SECRET        
-      - key: ADMIN_TOKEN
-        fromSecret: ADMIN_TOKEN       
       - key: CRON_ENABLE
         value: "true"
       - key: CRON_FEEDS_SCHEDULE
