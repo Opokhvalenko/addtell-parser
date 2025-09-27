@@ -10,5 +10,3 @@ coverage/
 **/*.tsbuildinfo
 prisma/generated
 public/ads/feeds.json
-
-!render.yaml
