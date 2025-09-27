@@ -1,29 +1,39 @@
-import type { FastifyError, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyError, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
-const errorHandlerPlugin: FastifyPluginAsync = async (fastify) => {
+const plugin: FastifyPluginAsync = async (fastify) => {
   const isProd = process.env.NODE_ENV === "production";
 
-  fastify.setErrorHandler((err: FastifyError, req: FastifyRequest, reply: FastifyReply) => {
-    const status = typeof err.statusCode === "number" ? err.statusCode : 500;
-    const isClientErr = status >= 400 && status < 500;
+  fastify.setErrorHandler(
+    (err: FastifyError & { code?: string; validation?: unknown }, req, reply) => {
+      const status = typeof err.statusCode === "number" ? err.statusCode : 500;
+      const isClientErr = status >= 400 && status < 500;
+      const isValidation = err.code === "FST_ERR_VALIDATION" || !!err.validation;
 
-    const log = isClientErr ? fastify.log.warn : fastify.log.error;
-    log({ err, reqId: req.id, method: req.method, url: req.url }, "request errored");
+      if (isClientErr) {
+        req.log.warn({ err, reqId: req.id, method: req.method, url: req.url }, "request errored");
+      } else {
+        req.log.error({ err, reqId: req.id, method: req.method, url: req.url }, "request errored");
+      }
 
-    const body: Record<string, unknown> = {
-      statusCode: status,
-      error: err.name || "Error",
-      message: err.message,
-      requestId: req.id,
-    };
-    if (!isProd && err.stack) body.stack = err.stack;
+      const body: Record<string, unknown> = {
+        statusCode: status,
+        error: isValidation ? "BadRequestError" : err.name || "Error",
+        message: isClientErr ? err.message : isProd ? "Internal Server Error" : err.message,
+        requestId: req.id,
+      };
 
-    reply.status(status).send(body);
-  });
+      if (!isProd) {
+        if (isValidation && err.validation) body.issues = err.validation;
+        else if (err.stack) body.stack = err.stack;
+      }
 
-  fastify.setNotFoundHandler((req: FastifyRequest, reply: FastifyReply) => {
-    reply.status(404).send({
+      reply.code(status).send(body);
+    },
+  );
+
+  fastify.setNotFoundHandler((req, reply) => {
+    reply.code(404).send({
       statusCode: 404,
       error: "Not Found",
       message: "Route not found",
@@ -32,4 +42,4 @@ const errorHandlerPlugin: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-export default fp(errorHandlerPlugin, { name: "error-handler" });
+export default fp(plugin, { name: "error-handler" });

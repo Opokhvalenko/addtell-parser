@@ -68,8 +68,14 @@ services:
       PORT: "3000"
       HOST: "0.0.0.0"
       DATABASE_URL: "mongodb://root:root@mongo:27017/feeds?authSource=admin&replicaSet=rs0"
-      DEFAULT_FEED_URL: "https://hnrss.org/frontpage"
       JWT_SECRET: "this_is_a_demo_secret_change_me_32+_chars_long"
+      ADMIN_TOKEN: "supersecret"
+      CRON_ENABLE: "true"
+      CRON_FEEDS_SCHEDULE: "*/10 * * * *"
+      CRON_TZ: "UTC"
+      FEEDS_SOURCES: '["https://hnrss.org/frontpage","https://hnrss.org/newest"]'
+      FEEDS_OUT: "public/ads/feeds.json"
+      DEFAULT_FEED_URL: "https://hnrss.org/frontpage"
     ports:
       - "3000:3000"
 

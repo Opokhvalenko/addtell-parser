@@ -1,4 +1,4 @@
-(function () {
+(() => {
   try {
     rs.status();
     print("replica set already initiated");
@@ -16,13 +16,7 @@
   while (tries-- > 0) {
     try {
       var st = rs.status();
-      if (
-        st.ok === 1 &&
-        st.members &&
-        st.members.some(function (m) {
-          return m.stateStr === "PRIMARY";
-        })
-      ) {
+      if (st.ok === 1 && st.members && st.members.some((m) => m.stateStr === "PRIMARY")) {
         print("replica set is PRIMARY");
         break;
       }

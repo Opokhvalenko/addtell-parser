@@ -25,18 +25,17 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
-
 model FeedItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  feedId    String   @db.ObjectId
-  feed      Feed     @relation(fields: [feedId], references: [id])
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  feedId    String    @db.ObjectId
+  feed      Feed      @relation(fields: [feedId], references: [id])
   guid      String?
   link      String
   title     String?
   content   String?
   pubDate   DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  @@index([feedId])
   @@unique([feedId, link])
+  @@index([feedId])
 }
