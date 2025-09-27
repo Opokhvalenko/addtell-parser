@@ -2,7 +2,7 @@ services:
   - type: web
     name: addtell-backend
     env: docker
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: Dockerfile
     plan: free
     autoDeploy: true
     envVars:
