@@ -9,4 +9,6 @@ dist/**
 coverage/
 **/*.tsbuildinfo
 prisma/generated
-printf "public/ads/feeds.json\n"
+public/ads/feeds.json
+
+!render.yaml

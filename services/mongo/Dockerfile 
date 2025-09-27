@@ -1,2 +1,3 @@
 FROM mongo:7
+# ініціалізація replica set при першому старті
 COPY init-rs.js /docker-entrypoint-initdb.d/init-rs.js
