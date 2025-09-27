@@ -5,14 +5,19 @@ services:
     dockerfilePath: Dockerfile
     plan: free
     autoDeploy: true
-
     envVars:
       - key: NODE_ENV
         value: production
       - key: HOST
         value: 0.0.0.0
       - key: DEFAULT_FEED_URL
-        value: "https://hnrss.org/frontpage"
+        value: https://hnrss.org/frontpage
+      - key: DATABASE_URL
+        fromSecret: ATLAS_DB_URL      
+      - key: JWT_SECRET
+        fromSecret: JWT_SECRET        
+      - key: ADMIN_TOKEN
+        fromSecret: ADMIN_TOKEN       
       - key: CRON_ENABLE
         value: "true"
       - key: CRON_FEEDS_SCHEDULE
@@ -23,9 +28,3 @@ services:
         value: '["https://hnrss.org/frontpage","https://hnrss.org/newest"]'
       - key: FEEDS_OUT
         value: "public/ads/feeds.json"
-      - key: DATABASE_URL
-        fromSecret: ATLAS_DB_URL
-      - key: JWT_SECRET
-        fromSecret: JWT_SECRET
-      - key: ADMIN_TOKEN
-        fromSecret: ADMIN_TOKEN
