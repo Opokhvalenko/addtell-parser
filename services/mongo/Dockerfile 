@@ -1,0 +1,2 @@
+FROM mongo:7
+COPY init-rs.js /docker-entrypoint-initdb.d/init-rs.js
