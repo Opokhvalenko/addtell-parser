@@ -9,7 +9,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: HOST
-        value: 0.0.0.0         
+        value: 0.0.0.0
+      - key: DEFAULT_FEED_URL
+        value: https://hnrss.org/frontpage   
       - key: DATABASE_URL
         value: mongodb+srv://feeds_user:***@cluster0....mongodb.net/feeds?retryWrites=true&w=majority&appName=Cluster0
       - key: JWT_SECRET

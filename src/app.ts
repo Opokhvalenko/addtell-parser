@@ -14,6 +14,7 @@ export default async function buildApp(options: AppOptions = {}): Promise<Fastif
 
   const fastify = Fastify({
     ...options,
+    trustProxy: true,
     logger: prettyLogs
       ? {
           level: "info",
@@ -29,7 +30,7 @@ export default async function buildApp(options: AppOptions = {}): Promise<Fastif
           },
         }
       : { level: "info" },
-    disableRequestLogging: isDev,
+    disableRequestLogging: process.env.NODE_ENV !== "production",
   });
 
   // env/config
