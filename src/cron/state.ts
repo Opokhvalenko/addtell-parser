@@ -68,7 +68,6 @@ export function createCronState(cfg: CronConfig) {
         lastFinishedAt,
         lastOk,
         lastFail,
-        // <- прибрали union: завжди number
         lastDurationMs: durations[durations.length - 1] ?? 0,
         durations: [...durations],
 

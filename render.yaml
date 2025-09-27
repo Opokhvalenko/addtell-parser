@@ -1,35 +1,17 @@
 services:
-  # MongoDB (private Docker service)
-  - type: pserv
-    name: mongo
-    env: docker
-    plan: starter
-    dockerfilePath: services/mongo/Dockerfile
-    dockerCommand: "mongod --replSet rs0 --bind_ip_all --auth"
-    disk:
-      name: mongo-data
-      mountPath: /data/db
-      sizeGB: 1
-    envVars:
-      - key: MONGO_INITDB_ROOT_USERNAME
-        value: root
-      - key: MONGO_INITDB_ROOT_PASSWORD
-        value: root
-
-  # Node backend
   - type: web
-    name: addtell-parser-backend
-    env: node
+    name: addtell-backend
+    env: docker
+    dockerfilePath: Dockerfile     
     plan: free
-    buildCommand: npm ci && npx prisma generate && npm run build
-    startCommand: node dist/index.js
+    autoDeploy: true
     envVars:
-      - key: HOST
-        value: 0.0.0.0
-      - key: PORT
-        value: "3000"
+      - key: NODE_ENV
+        value: production
       - key: DATABASE_URL
-        value: "mongodb://root:root@mongo:27017/feeds?authSource=admin&replicaSet=rs0"
+        sync: false              
+      - key: JWT_SECRET
+        generateValue: true
       - key: ADMIN_TOKEN
         value: supersecret
       - key: CRON_ENABLE
@@ -42,3 +24,4 @@ services:
         value: '["https://hnrss.org/frontpage","https://hnrss.org/newest"]'
       - key: FEEDS_OUT
         value: "public/ads/feeds.json"
+    healthCheckPath: /health
