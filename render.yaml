@@ -1,0 +1,47 @@
+services:
+  # MongoDB (private, Docker) 
+  - type: private_service
+    name: mongo
+    env: docker
+    plan: starter               
+    dockerfilePath: services/mongo/Dockerfile
+    disk:
+      name: mongo-data
+      mountPath: /data/db
+      sizeGB: 1
+    envVars:
+      - key: MONGO_INITDB_ROOT_USERNAME
+        value: root
+      - key: MONGO_INITDB_ROOT_PASSWORD
+        value: root
+    # Запускаємо mongod з реплікою та auth
+    startCommand: mongod --replSet rs0 --bind_ip_all --auth
+
+  # Node backend (web)
+  - type: web
+    name: addtell-parser-backend
+    env: node
+    plan: free
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: node dist/index.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        value: mongodb://root:root@mongo:27017/feeds?replicaSet=rs0&authSource=admin
+      - key: ADMIN_TOKEN
+        generateValue: true
+      # CRON і джерела 
+      - key: CRON_ENABLE
+        value: "true"
+      - key: CRON_FEEDS_SCHEDULE
+        value: "*/10 * * * *"
+      - key: CRON_TZ
+        value: "UTC"
+      - key: FEEDS_SOURCES
+        value: '["https://hnrss.org/frontpage","https://hnrss.org/newest"]'
+      - key: FEEDS_OUT
+        value: "public/ads/feeds.json"
