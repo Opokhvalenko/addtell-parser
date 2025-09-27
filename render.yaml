@@ -1,15 +1,11 @@
 services:
+  # MongoDB (private Docker service)
   - type: pserv
     name: mongo
     env: docker
     plan: starter
     dockerfilePath: services/mongo/Dockerfile
-    dockerCommand:
-      - mongod
-      - --replSet
-      - rs0
-      - --bind_ip_all
-      - --auth
+    dockerCommand: "mongod --replSet rs0 --bind_ip_all --auth"
     disk:
       name: mongo-data
       mountPath: /data/db
@@ -20,6 +16,7 @@ services:
       - key: MONGO_INITDB_ROOT_PASSWORD
         value: root
 
+  # Node backend
   - type: web
     name: addtell-parser-backend
     env: node
@@ -32,7 +29,7 @@ services:
       - key: PORT
         value: "3000"
       - key: DATABASE_URL
-        value: mongodb://root:root@mongo:27017/feeds?authSource=admin&replicaSet=rs0
+        value: "mongodb://root:root@mongo:27017/feeds?authSource=admin&replicaSet=rs0"
       - key: ADMIN_TOKEN
         value: supersecret
       - key: CRON_ENABLE
@@ -40,8 +37,8 @@ services:
       - key: CRON_FEEDS_SCHEDULE
         value: "*/10 * * * *"
       - key: CRON_TZ
-        value: UTC
+        value: "UTC"
       - key: FEEDS_SOURCES
         value: '["https://hnrss.org/frontpage","https://hnrss.org/newest"]'
       - key: FEEDS_OUT
-        value: public/ads/feeds.json
+        value: "public/ads/feeds.json"
