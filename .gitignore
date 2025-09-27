@@ -32,3 +32,4 @@ lerna-debug.log*
 
 backend/.env
 public/ads/feeds.json
+printf "public/ads/feeds.json\n"
