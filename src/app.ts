@@ -33,16 +33,17 @@ export default async function buildApp(options: AppOptions = {}): Promise<Fastif
     disableRequestLogging: process.env.NODE_ENV !== "production",
   });
 
-  // env/config
+  // 1) env/config
   await fastify.register(configPlugin);
 
+  // 2) автозагрузка плагінів
   await fastify.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     encapsulate: false,
     ignorePattern: /(^_|\.d\.ts$|\.test\.ts$)/i,
   });
 
-  // autoload routes
+  // 3) автозагрузка маршрутів
   await fastify.register(AutoLoad, {
     dir: join(__dirname, "routes"),
     encapsulate: false,
@@ -52,6 +53,5 @@ export default async function buildApp(options: AppOptions = {}): Promise<Fastif
   });
 
   fastify.get("/", async () => ({ hello: "world" }));
-
   return fastify;
 }
