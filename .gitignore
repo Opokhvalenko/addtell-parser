@@ -31,3 +31,5 @@ lerna-debug.log*
 *.tar
 
 backend/.env
+public/ads/feeds.json
+printf "public/ads/feeds.json\n"

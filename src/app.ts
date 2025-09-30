@@ -10,29 +10,40 @@ export type AppOptions = Partial<FastifyServerOptions>;
 
 export default async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const isDev = process.env.NODE_ENV !== "production";
+  const prettyLogs = isDev || process.env.PRETTY_LOGS === "1";
 
   const fastify = Fastify({
     ...options,
-    logger: isDev
+    trustProxy: true,
+    logger: prettyLogs
       ? {
           level: "info",
           transport: {
             target: "pino-pretty",
-            options: { translateTime: "SYS:standard", singleLine: true, colorize: true },
+            options: {
+              translateTime: "SYS:standard",
+              singleLine: true,
+              colorize: true,
+              ignore: "pid,hostname",
+              levelFirst: true,
+            },
           },
         }
       : { level: "info" },
-    disableRequestLogging: isDev,
+    disableRequestLogging: process.env.NODE_ENV !== "production",
   });
 
+  // 1) env/config
   await fastify.register(configPlugin);
 
+  // 2) автозагрузка плагінів
   await fastify.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     encapsulate: false,
     ignorePattern: /(^_|\.d\.ts$|\.test\.ts$)/i,
   });
 
+  // 3) автозагрузка маршрутів
   await fastify.register(AutoLoad, {
     dir: join(__dirname, "routes"),
     encapsulate: false,

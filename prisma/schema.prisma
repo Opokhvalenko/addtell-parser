@@ -25,18 +25,76 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
-
 model FeedItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  feedId    String   @db.ObjectId
-  feed      Feed     @relation(fields: [feedId], references: [id])
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  feedId    String    @db.ObjectId
+  feed      Feed      @relation(fields: [feedId], references: [id])
   guid      String?
   link      String
   title     String?
   content   String?
   pubDate   DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([feedId, link])
+  @@index([feedId])
+}
+
+model Creative {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  url       String
+  mime      String?
+  width     Int
+  height    Int
+  html      String?
   createdAt DateTime @default(now())
 
-  @@index([feedId])
-  @@unique([feedId, link])
+  // back-relation до LineItem (один креатив може використовуватись у кількох лайн-айтемах)
+  lineItems LineItem[]
+}
+
+model LineItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  creativeId String   @db.ObjectId
+  creative   Creative @relation(fields: [creativeId], references: [id])
+
+  sizes           String[]
+  adType          String
+  geo             String[] @default([])
+  minCpm          Float?
+  maxCpm          Float?
+  frequencyPerDay Int?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@index([active])
+}
+
+model Impression {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  uid        String
+  lineItemId String   @db.ObjectId
+  at         DateTime @default(now())
+
+  @@index([uid, lineItemId, at])
+}
+
+model AdEvent {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  kind       String
+  uid        String?
+  lineItemId String?  @db.ObjectId
+  at         DateTime @default(now())
+  tookMs     Int?
+  extra      Json?
+
+  @@index([kind, at])
+}
+
+model RequestCounter {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
