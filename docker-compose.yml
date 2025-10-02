@@ -21,10 +21,10 @@ services:
     volumes:
       - ./uploads:/app/uploads
 
-    user: "node"
-    read_only: true
+    user: "node"         
+    read_only: true      
     tmpfs:
-      - /tmp
+      - /tmp             
 
   mongo-keyfile:
     image: alpine:3.20
@@ -85,3 +85,4 @@ services:
 
 volumes:
   mongo_data:
+  
