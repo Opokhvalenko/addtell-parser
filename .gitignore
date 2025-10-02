@@ -8,7 +8,9 @@ dist/
 .env.test
 .env.production
 *.env
+.env.*
 !.env.example
+cookies.txt
 
 logs/
 *.log
@@ -33,3 +35,6 @@ lerna-debug.log*
 backend/.env
 public/ads/feeds.json
 printf "public/ads/feeds.json\n"
+
+/uploads/*
+!/uploads/.gitkeep

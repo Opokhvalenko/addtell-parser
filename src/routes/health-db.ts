@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { OkSchema } from "../schemas/health.js";
+import { type Ok, OkSchema } from "../schemas/health.js";
 
 function hasRunCommandRaw(
   client: object,
@@ -8,23 +8,27 @@ function hasRunCommandRaw(
   return typeof maybe.$runCommandRaw === "function";
 }
 
-const healthDbRoute: FastifyPluginAsync = async (fastify) => {
-  const prisma = fastify.prisma;
-
-  fastify.get(
+const healthDbRoute: FastifyPluginAsync = async (app) => {
+  app.get<{ Reply: Ok }>(
     "/health/db",
     { schema: { summary: "DB health", response: { 200: OkSchema } } },
     async () => {
+      const started = Date.now();
       try {
-        if (hasRunCommandRaw(prisma)) {
-          await prisma.$runCommandRaw({ ping: 1 });
+        if (hasRunCommandRaw(app.prisma)) {
+          await app.prisma.$runCommandRaw({ ping: 1 });
         } else {
-          await prisma.feed.count();
+          // fallback для не-Mongo провайдерів
+          await app.prisma.feed.count();
         }
+        const ms = Date.now() - started;
+        app.log.debug({ ms }, "db health ok");
         return { status: "ok" };
-      } catch (e) {
-        fastify.log.error(e);
-        throw fastify.httpErrors.internalServerError("DB not reachable");
+      } catch (err) {
+        const ms = Date.now() - started;
+        app.log.error({ err, ms }, "db health failed");
+        // 503 логічніший для health
+        throw app.httpErrors.serviceUnavailable("DB not reachable");
       }
     },
   );
