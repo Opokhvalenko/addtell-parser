@@ -1,9 +1,10 @@
-import type { Static } from "@sinclair/typebox";
-import { Type } from "@sinclair/typebox";
+import type { FromSchema } from "json-schema-to-ts";
 
-export const OkSchema = Type.Object(
-  { status: Type.Literal("ok") },
-  { additionalProperties: false },
-);
+export const OkSchema = {
+  type: "object",
+  properties: { status: { type: "string", const: "ok" } },
+  required: ["status"],
+  additionalProperties: false,
+} as const;
 
-export type Ok = Static<typeof OkSchema>;
+export type Ok = FromSchema<typeof OkSchema>;

@@ -4,7 +4,7 @@ import buildApp from "./app.js";
 async function start(): Promise<void> {
   const app: FastifyInstance = await buildApp();
 
-  const port = Number(app.config.PORT ?? 3000);
+  const port = app.config.PORT ?? 3000;
   const host = app.config.HOST ?? "0.0.0.0";
 
   try {

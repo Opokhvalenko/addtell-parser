@@ -3,36 +3,32 @@ import type { FromSchema } from "json-schema-to-ts";
 export const EnvSchema = {
   $id: "EnvSchema",
   type: "object",
-  $defs: { url: { type: "string", format: "uri" } },
+  $defs: {
+    url: { type: "string", format: "uri" },
+    nonEmpty: { type: "string", minLength: 1 },
+  },
   properties: {
-    PORT: { type: "integer", minimum: 1, maximum: 65535, default: 3000 },
-    HOST: { type: "string", default: "0.0.0.0" },
+    // Server
+    PORT: { type: "integer", minimum: 1, maximum: 65535 },
+    HOST: { type: "string" },
 
-    UPLOADS_DIR: { type: "string", default: "./uploads" },
-
+    // Database
     DATABASE_URL: { $ref: "#/$defs/url" },
 
-    DEFAULT_FEED_URL: { $ref: "#/$defs/url", default: "https://hnrss.org/frontpage" },
+    // Features
+    DEFAULT_FEED_URL: { $ref: "#/$defs/url" },
 
+    // Auth
     JWT_SECRET: { type: "string", minLength: 32 },
-    ADMIN_TOKEN: { type: "string" },
-    COOKIE_SECRET: { type: "string" },
 
-    APP_ORIGIN: { $ref: "#/$defs/url" },
-    CORS_ORIGINS: { type: "string" },
-
-    NODE_ENV: {
-      type: "string",
-      enum: ["development", "test", "production"],
-      default: "development",
-    },
+    // Optional quality-of-life vars
+    NODE_ENV: { type: "string", enum: ["development", "test", "production"] },
     LOG_LEVEL: {
       type: "string",
       enum: ["fatal", "error", "warn", "info", "debug", "trace", "silent"],
-      default: "info",
     },
   },
-  required: ["DATABASE_URL", "JWT_SECRET"],
+  required: ["PORT", "HOST", "DATABASE_URL", "JWT_SECRET"],
   additionalProperties: false,
 } as const;
 
