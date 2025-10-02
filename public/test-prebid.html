@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8" />
+<title>Prebid Test</title>
+<script src="/prebid10.10.0.js"></script>
+<div id="ad-slot" style="width:300px;height:250px;border:1px solid #ccc"></div>
+<script>
+  window.pbjs = window.pbjs || {}; pbjs.que = pbjs.que || [];
+  const adUnit = {
+    code: 'ad-slot',
+    mediaTypes: { banner: { sizes: [[300,250]] } },
+    bids: [{ bidder: 'pokhvalenko', params: { endpoint: '/adserver/bid' } }]
+  };
+  pbjs.que.push(function(){
+    pbjs.addAdUnits(adUnit);
+    pbjs.requestBids({
+      bidsBackHandler: function(){
+        const bid = pbjs.getHighestCpmBids('ad-slot')[0];
+        if (!bid) return;
+        document.getElementById('ad-slot').innerHTML = bid.ad || bid.adm || '';
+      }
+    });
+  });
+</script>
