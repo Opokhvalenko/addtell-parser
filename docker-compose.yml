@@ -1,4 +1,39 @@
+version: "3.9"
+name: adtell-stack
+
 services:
+  # -------------------- Backend --------------------
+  backend:
+    build: .
+    container_name: backend
+    restart: unless-stopped
+
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      HOST: 0.0.0.0
+      UPLOADS_DIR: /app/uploads
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      - ./uploads:/app/uploads
+
+    user: "node"         
+    read_only: true      
+    tmpfs:
+      - /tmp             
+
+    depends_on:
+      mongo:
+        condition: service_healthy
+    profiles: ["local-db"]
+
+  # -------------------- MongoDB (локально) --------------------
   mongo-keyfile:
     image: alpine:3.20
     command: >
@@ -14,21 +49,20 @@ services:
     volumes:
       - mongo_data:/data
     restart: "no"
+    profiles: ["local-db"]
 
   mongo:
     image: mongo:7
     depends_on:
       mongo-keyfile:
         condition: service_completed_successfully
-    command:
-      [ "mongod", "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/config/keyfile" ]
+    command: ["mongod","--replSet","rs0","--bind_ip_all","--keyFile","/data/config/keyfile"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: root
     ports:
-      - "27017:27017" 
+      - "27017:27017"
     volumes:
-      - mongo_data:/data/db
       - mongo_data:/data
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' -u root -p root --authenticationDatabase admin | grep 1 || exit 1"]
@@ -36,6 +70,7 @@ services:
       timeout: 5s
       retries: 60
       start_period: 20s
+    profiles: ["local-db"]
 
   mongo-setup:
     image: mongo:7
@@ -54,30 +89,8 @@ services:
           catch (e) { print("Replica set not initiated, initiating...");
             rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] }); }
         '
-
-  backend:
-    build: .
-    container_name: backend
-    depends_on:
-      mongo:
-        condition: service_healthy
-      mongo-setup:
-        condition: service_completed_successfully
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      HOST: "0.0.0.0"
-      DATABASE_URL: "mongodb://root:root@mongo:27017/feeds?authSource=admin&replicaSet=rs0"
-      JWT_SECRET: "this_is_a_demo_secret_change_me_32+_chars_long"
-      ADMIN_TOKEN: "supersecret"
-      CRON_ENABLE: "true"
-      CRON_FEEDS_SCHEDULE: "*/10 * * * *"
-      CRON_TZ: "UTC"
-      FEEDS_SOURCES: '["https://hnrss.org/frontpage","https://hnrss.org/newest"]'
-      FEEDS_OUT: "public/ads/feeds.json"
-      DEFAULT_FEED_URL: "https://hnrss.org/frontpage"
-    ports:
-      - "3000:3000"
+    profiles: ["local-db"]
 
 volumes:
   mongo_data:
+  
