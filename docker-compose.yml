@@ -1,8 +1,6 @@
-version: "3.9"
 name: adtell-stack
 
 services:
-  # -------------------- Backend --------------------
   backend:
     build: .
     container_name: backend
@@ -28,12 +26,6 @@ services:
     tmpfs:
       - /tmp             
 
-    depends_on:
-      mongo:
-        condition: service_healthy
-    profiles: ["local-db"]
-
-  # -------------------- MongoDB (локально) --------------------
   mongo-keyfile:
     image: alpine:3.20
     command: >
