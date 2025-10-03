@@ -1,6 +1,8 @@
 import "fastify";
 import type { PrismaClient } from "@prisma/client";
 import type { CronStatus } from "../cron/types";
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { Registry, Counter } from "prom-client";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -13,7 +15,6 @@ declare module "fastify" {
 
       JWT_SECRET: string;
       COOKIE_SECRET: string;
-      /** for local HTTP in docker: set to "false" */
       COOKIE_SECURE?: "true" | "false";
 
       APP_ORIGIN?: string;
@@ -23,6 +24,22 @@ declare module "fastify" {
       UPLOADS_DIR: string;
       DEFAULT_FEED_URL?: string;
       DATABASE_URL: string;
+
+      CLICKHOUSE_URL?: string;
+      CLICKHOUSE_DB?: string;
+      CLICKHOUSE_USER?: string;
+      CLICKHOUSE_PASSWORD?: string;
+      CLICKHOUSE_TABLE?: string;
+
+      CH_BATCH_SIZE?: string | number;
+      CH_FLUSH_MS?: string | number;
+    };
+
+    clickhouse?: ClickHouseClient;
+
+    metrics?: {
+      register: Registry;
+      ingestCounter: Counter<string>;
     };
 
     prisma: PrismaClient;

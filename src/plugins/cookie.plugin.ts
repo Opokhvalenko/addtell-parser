@@ -4,15 +4,23 @@ import fp from "fastify-plugin";
 
 const UID_COOKIE = "uid";
 
+type CfgExtra = {
+  COOKIE_SECURE?: "true" | "false";
+  APP_ORIGIN?: string;
+};
+
 export default fp(
   async (app) => {
     const secret = app.config.COOKIE_SECRET ?? app.config.JWT_SECRET;
     await app.register(cookie, { secret, hook: "onRequest" });
 
-    type MaybeCookieSecure = { COOKIE_SECURE?: "true" | "false" };
-    const cfg = app.config as typeof app.config & MaybeCookieSecure;
+    const cfg = app.config as typeof app.config & CfgExtra;
 
-    const secureCookies = cfg.NODE_ENV === "production" && cfg.COOKIE_SECURE !== "false";
+    const isProd = cfg.NODE_ENV === "production";
+    const secureCookies = isProd && cfg.COOKIE_SECURE !== "false";
+
+    const sameSite: "lax" | "none" =
+      isProd && !(cfg.APP_ORIGIN ?? "").includes("localhost") ? "none" : "lax";
 
     app.addHook("onRequest", async (req, reply) => {
       const raw = req.cookies?.[UID_COOKIE] as string | undefined;
@@ -26,7 +34,7 @@ export default fp(
             reply.setCookie(UID_COOKIE, id, {
               path: "/",
               httpOnly: true,
-              sameSite: "lax",
+              sameSite,
               secure: secureCookies,
               maxAge: 60 * 60 * 24 * 365,
               signed: true,
@@ -40,7 +48,7 @@ export default fp(
         reply.setCookie(UID_COOKIE, id, {
           path: "/",
           httpOnly: true,
-          sameSite: "lax",
+          sameSite,
           secure: secureCookies,
           maxAge: 60 * 60 * 24 * 365,
           signed: true,

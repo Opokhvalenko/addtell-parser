@@ -9,14 +9,23 @@ import {
 } from "./schemas.js";
 import { loginUser, registerUser } from "./service.js";
 
+type CfgExtra = { COOKIE_SECURE?: "true" | "false"; APP_ORIGIN?: string };
+
 const routes: FastifyPluginAsync = async (app) => {
+  const cfg = app.config as typeof app.config & CfgExtra;
+
+  const isProd = cfg.NODE_ENV === "production";
+  const secure = isProd && cfg.COOKIE_SECURE !== "false";
+  const sameSite: "lax" | "none" =
+    isProd && !(cfg.APP_ORIGIN ?? "").includes("localhost") ? "none" : "lax";
+
   const cookieOpts = {
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite,
     path: "/",
-    secure: app.config.NODE_ENV === "production",
+    secure,
     maxAge: 60 * 60 * 24 * 30,
-  };
+  } as const;
 
   app.post<{ Body: RegisterBody }>(
     "/auth/register",
@@ -46,7 +55,7 @@ const routes: FastifyPluginAsync = async (app) => {
   );
 
   app.post("/auth/logout", async (_req, reply) => {
-    reply.clearCookie("token", { path: "/" });
+    reply.clearCookie("token", { path: "/", sameSite, secure });
     return { ok: true };
   });
 };

@@ -2,7 +2,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad from "@fastify/autoload";
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
-
 import configPlugin from "./config/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,6 +48,14 @@ export default async function buildApp(options: AppOptions = {}): Promise<Fastif
   await app.register((await import("./modules/feed/routes.js")).default);
   await app.register((await import("./modules/feed/routes.article.js")).default);
 
+  await app.register((await import("./modules/stats/routes.stats.js")).default, { prefix: "/api" });
+  await app.register((await import("./modules/analytics/routes.report.js")).default, {
+    prefix: "/api",
+  });
+  await app.register((await import("./modules/analytics/routes.logs.js")).default, {
+    prefix: "/api",
+  });
+
   await app.register((await import("./modules/adserver/routes.bid.js")).default, {
     prefix: "/adserver",
   });
@@ -56,20 +63,12 @@ export default async function buildApp(options: AppOptions = {}): Promise<Fastif
     prefix: "/adserver",
   });
   await app.register((await import("./modules/adserver/routes.lineitem.js")).default);
-  try {
-    await app.register((await import("./modules/adserver/routes.stats.js")).default, {
-      prefix: "/adserver",
-    });
-  } catch {
-    /* optional */
-  }
 
-  app.get("/create", { preHandler: app.authenticate }, async (req, reply) => {
-    const { renderCreateLineItem } = await import(
-      "./modules/adserver/ssr/pages/create-lineitem.js"
-    );
-    return reply.type("text/html").send(renderCreateLineItem({ user: req.user }));
+  await app.register((await import("./modules/adserver/routes.metrics.js")).default, {
+    prefix: "/adserver",
   });
+
+  await app.register((await import("./modules/adserver/routes.create.js")).default);
 
   if (!isProd) {
     await app.ready();

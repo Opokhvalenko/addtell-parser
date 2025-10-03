@@ -1,31 +1,80 @@
 name: adtell-stack
 
 services:
+  # ---------- CLICKHOUSE ----------
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-mydb}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-mypassword}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
+  # ---------- TABIX UI ----------
+  tabix:
+    image: spoonest/clickhouse-tabix-web-client:latest
+    container_name: tabix
+    platform: linux/amd64        
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-mypassword}
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  # ---------- BACKEND ----------
   backend:
-    build: .
+    build:
+      context: .                 
+      dockerfile: Dockerfile
     container_name: backend
     restart: unless-stopped
-
-    env_file:
-      - .env
+    env_file: [.env]
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-3000}
       HOST: 0.0.0.0
       UPLOADS_DIR: /app/uploads
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      APP_ORIGIN: http://localhost:5173
+
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-mydb}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-mypassword}
 
     ports:
       - "3000:3000"
-
     volumes:
-      - ./uploads:/app/uploads
+      - ./uploads:/app/uploads   
+      - ./public:/app/public     
+    user: "node"
+    read_only: true              
+    tmpfs: [/tmp]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
 
-    user: "node"         
-    read_only: true      
-    tmpfs:
-      - /tmp             
-
+  # ---------- MONGO (опційно, профіль local-db) ----------
   mongo-keyfile:
     image: alpine:3.20
     command: >
@@ -58,10 +107,10 @@ services:
       - mongo_data:/data
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' -u root -p root --authenticationDatabase admin | grep 1 || exit 1"]
-      interval: 5s
-      timeout: 5s
+      interval: "5s"
+      timeout: "5s"
       retries: 60
-      start_period: 20s
+      start_period: "20s"
     profiles: ["local-db"]
 
   mongo-setup:
@@ -84,5 +133,5 @@ services:
     profiles: ["local-db"]
 
 volumes:
+  clickhouse_data:
   mongo_data:
-  
