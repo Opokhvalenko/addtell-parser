@@ -5,8 +5,10 @@ export default fp(
     app.addHook("onSend", async (request, reply, _payload) => {
       const cfg = app.config as typeof app.config & { FRAME_ANCESTORS?: string; NODE_ENV?: string };
       const isProd = (cfg.NODE_ENV ?? process.env.NODE_ENV) === "production";
+
       const devDefaults =
         "'self' http://localhost:3000 http://127.0.0.1:3000 http://localhost:5173 http://127.0.0.1:5173";
+
       const FRAME_ANCESTORS =
         cfg.FRAME_ANCESTORS && cfg.FRAME_ANCESTORS.trim().length > 0
           ? cfg.FRAME_ANCESTORS.trim()
@@ -17,12 +19,15 @@ export default fp(
       const isLineItemPage = request.url.startsWith("/create-lineitem");
       const isTwEmbedCss = request.url.startsWith("/assets/tw-embed.css");
 
+      const baseImgSrc = "img-src 'self' data: https: http:";
+      const imgSrc = isLineItemPage ? `${baseImgSrc} blob:` : baseImgSrc;
+
       const csp = [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
-        "img-src 'self' data: https: http:",
+        imgSrc,
         "connect-src 'self' https://www.google-analytics.com https://analytics.google.com",
         "frame-src 'self' https://www.google.com",
         "object-src 'none'",

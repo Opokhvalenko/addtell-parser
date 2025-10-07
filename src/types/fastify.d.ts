@@ -34,6 +34,7 @@ declare module "fastify" {
       internalServerError: (message?: string) => Error;
     };
   }
+
   interface FastifyContextConfig {
     public?: boolean;
   }
