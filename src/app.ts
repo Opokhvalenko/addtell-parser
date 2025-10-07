@@ -1,3 +1,6 @@
+import "./telemetry/index.js";
+
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad from "@fastify/autoload";
@@ -5,12 +8,19 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastif
 import configPlugin from "./config/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 export type AppOptions = Partial<FastifyServerOptions>;
 
 function makeLogger(usePretty: boolean) {
-  if (!usePretty) return { level: "info" } as const;
+  const level = process.env.LOG_LEVEL ?? "info";
+  if (!usePretty) return { level } as const;
+  try {
+    require.resolve("pino-pretty");
+  } catch {
+    return { level } as const;
+  }
   return {
-    level: "info",
+    level,
     transport: {
       target: "pino-pretty",
       options: {
@@ -24,7 +34,7 @@ function makeLogger(usePretty: boolean) {
   } as const;
 }
 
-export default async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
+export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const isProd = process.env.NODE_ENV === "production";
   const usePretty = !isProd || process.env.PRETTY_LOGS === "1";
 
@@ -35,45 +45,38 @@ export default async function buildApp(options: AppOptions = {}): Promise<Fastif
     disableRequestLogging: !isProd,
   });
 
+  // 1) config
   await app.register(configPlugin);
 
+  // 2) базові плагіни
+  await app.register((await import("./plugins/otel.plugin.js")).default);
+  await app.register((await import("./plugins/health.plugin.js")).default);
+  await app.register((await import("./plugins/security-headers.plugin.js")).default);
+  await app.register((await import("./plugins/rate-limit.plugin.js")).default);
+  await app.register((await import("./plugins/audit-logging.plugin.js")).default);
+
+  //  реєструємо core-auth раніше за всі роути
+  await app.register((await import("./plugins/jwt.plugin.js")).default);
+  await app.register((await import("./plugins/auth.plugin.js")).default);
+
+  // 3) аналітика (один раз)
+  await app.register((await import("./plugins/analytics.plugin.js")).default);
+
+  // 4) інші плагіни через автолоад,
   await app.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
-    ignorePattern: /^(?!.*\.plugin\.(t|j)s$).+/i,
+    // ігноруємо core-плагіни, які вже підняли вручну
+    ignorePattern:
+      /^(otel|health|security-headers|rate-limit|audit-logging|jwt|auth|analytics|cookie)\.plugin\.(js|mjs|cjs)$/i,
     encapsulate: true,
   });
 
-  await app.register((await import("./modules/auth/routes.js")).default);
-  await app.register((await import("./modules/uploads/routes.js")).default);
-  await app.register((await import("./modules/feed/routes.js")).default);
-  await app.register((await import("./modules/feed/routes.article.js")).default);
-
-  await app.register((await import("./modules/stats/routes.stats.js")).default, { prefix: "/api" });
-  await app.register((await import("./modules/analytics/routes.report.js")).default, {
-    prefix: "/api",
-  });
-  await app.register((await import("./modules/analytics/routes.logs.js")).default, {
-    prefix: "/api",
-  });
-
-  await app.register((await import("./modules/adserver/routes.bid.js")).default, {
-    prefix: "/adserver",
-  });
-  await app.register((await import("./modules/adserver/routes.click.js")).default, {
-    prefix: "/adserver",
-  });
-  await app.register((await import("./modules/adserver/routes.lineitem.js")).default);
-
-  await app.register((await import("./modules/adserver/routes.metrics.js")).default, {
-    prefix: "/adserver",
-  });
-
-  await app.register((await import("./modules/adserver/routes.create.js")).default);
+  // демо-роути
+  await app.register((await import("./routes/beautiful-ad.js")).default);
 
   if (!isProd) {
     await app.ready();
     app.log.info(`\n${app.printRoutes()}`);
   }
-
   return app;
 }

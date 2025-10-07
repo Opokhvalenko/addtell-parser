@@ -12,7 +12,7 @@
     }
   },
   "files": {
-    "includes": ["**", "!node_modules", "!dist", "!coverage"],
+    "includes": ["**", "!node_modules", "!dist", "!coverage", "!public/assets"],
     "ignoreUnknown": true
   }
 }

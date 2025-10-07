@@ -1,7 +1,10 @@
 import fastifyEnv from "@fastify/env";
 import type { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-import { ajvFormatsPlugin } from "../lib/ajvFormatsPlugin.js";
+
+import type { AjvLike } from "../plugins/ajv-formats.plugin.js";
+import { ajvFormatsPlugin } from "../plugins/ajv-formats.plugin.js";
+
 import type { Config } from "./schema.js";
 import { EnvSchema } from "./schema.js";
 
@@ -23,8 +26,8 @@ const configPlugin: FastifyPluginAsync = async (app) => {
     dotenv: true,
     data: process.env,
     ajv: {
-      customOptions(ajv) {
-        ajvFormatsPlugin(ajv as unknown as Record<string, unknown>);
+      customOptions(ajv: AjvLike) {
+        ajvFormatsPlugin(ajv);
         ajv.opts.allErrors = true;
         ajv.opts.coerceTypes = true;
         ajv.opts.useDefaults = true;

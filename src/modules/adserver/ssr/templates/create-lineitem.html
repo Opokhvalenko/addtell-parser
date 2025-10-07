@@ -1,14 +1,20 @@
 <!doctype html>
 <html lang="uk">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Create Line Item</title>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { margin: 0; background: transparent !important; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body>
   <div class="max-w-3xl mx-auto p-6">
-    <h1 class="text-2xl font-bold mb-2">Створення реклами (Line Item)</h1>
-    <p class="mb-4 text-sm text-slate-600">Вітаємо, <strong>%%USER_EMAIL%%</strong></p>
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold mb-2 text-gray-900">Створення реклами (Line Item)</h1>
+      <p class="text-sm text-gray-600">Вітаємо, <strong class="text-blue-600">%%USER_EMAIL%%</strong></p>
+    </div>
 
     <div id="li-form-root"></div>
   </div>
@@ -18,45 +24,90 @@
       const host = document.getElementById('li-form-root');
       const shadow = host.attachShadow({ mode: 'open' });
 
-      const tw = document.createElement('link');
-      tw.rel = 'stylesheet';
-      tw.href = 'https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css';
-      shadow.appendChild(tw);
+      // Tailwind, зібраний локально (CSP-safe)
+    const tw = document.createElement('link');
+tw.rel = 'stylesheet';
+tw.href = '/assets/tw-embed.css?v=1';   // cache bust
+shadow.appendChild(tw);
 
+      const customStyles = document.createElement('style');
+      customStyles.textContent = `
+        :host {
+          --bg-primary:#fff; --bg-secondary:#f9fafb;
+          --text-primary:#111827; --text-secondary:#6b7280;
+          --border-color:#d1d5db; --input-bg:#fff; --input-border:#d1d5db;
+          --button-bg:#3b82f6; --button-hover:#2563eb;
+        }
+        @media (prefers-color-scheme: dark) {
+          :host {
+            --bg-primary:#1f2937; --bg-secondary:#111827;
+            --text-primary:#f9fafb; --text-secondary:#9ca3af;
+            --border-color:#374151; --input-bg:#374151; --input-border:#4b5563;
+            --button-bg:#3b82f6; --button-hover:#2563eb;
+          }
+        }
+        :host-context(html.dark), :host-context(body.dark) {
+          --bg-primary:#1f2937; --bg-secondary:#111827;
+          --text-primary:#f9fafb; --text-secondary:#9ca3af;
+          --border-color:#374151; --input-bg:#374151; --input-border:#4b5563;
+          --button-bg:#3b82f6; --button-hover:#2563eb;
+        }
+        .bg-white{ background-color:var(--bg-primary)!important; }
+        .text-gray-900{ color:var(--text-primary)!important; }
+        .text-gray-600{ color:var(--text-secondary)!important; }
+        .border-gray-300{ border-color:var(--border-color)!important; }
+        input,select,textarea{
+          background-color:var(--input-bg)!important;
+          border-color:var(--input-border)!important;
+          color:var(--text-primary)!important;
+        }
+        input[type="file"]{ background-color:var(--input-bg)!important; border-color:var(--input-border)!important; color:var(--text-primary)!important; }
+        input[type="file"]::-webkit-file-upload-button{
+          background-color:var(--button-bg)!important; color:#fff!important; border:none!important;
+          border-radius:.375rem!important; padding:.5rem .75rem!important; margin-right:.75rem!important; cursor:pointer!important;
+        }
+        input[type="file"]::-webkit-file-upload-button:hover{ background-color:var(--button-hover)!important; }
+        input[type="file"]::-ms-browse{ background-color:var(--button-bg)!important; color:#fff!important; border:none!important; border-radius:.375rem!important; padding:.5rem .75rem!important; margin-right:.75rem!important; cursor:pointer!important; }
+        input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+        input[type=number]{ -moz-appearance:textfield; }
+      `;
+      shadow.appendChild(customStyles);
+
+      // Карточка форми
       const wrap = document.createElement('div');
-      wrap.className = 'bg-white rounded-2xl shadow p-6';
+      wrap.className = 'bg-white rounded-2xl shadow-2xl border border-gray-300 p-6';
       wrap.innerHTML = `
-        <form id="li-form" class="space-y-5" method="post" action="/ads/lineitems" enctype="multipart/form-data" novalidate>
+        <form id="li-form" class="space-y-6" method="post" action="/ads/lineitems" enctype="multipart/form-data" novalidate>
           <div>
-            <label class="block text-sm font-medium mb-1">Назва</label>
-            <input name="name" required class="mt-1 w-full border rounded p-2" />
+            <label class="block text-sm font-medium mb-2 text-gray-900">Назва</label>
+            <input name="name" required class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Введіть назву реклами" />
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1">Розміри (напр. <code>300x250,300x600</code>)</label>
-            <input name="sizes" required pattern="^\\s*\\d+x\\d+(\\s*,\\s*\\d+x\\d+)*\\s*$" class="mt-1 w-full border rounded p-2" />
-            <p class="text-xs text-slate-500 mt-1">Підтримується список через кому.</p>
+            <label class="block text-sm font-medium mb-2 text-gray-900">Розміри (напр. <code class="bg-gray-200 px-2 py-1 rounded text-blue-600">300x250,300x600</code>)</label>
+            <input name="sizes" required pattern="^\\s*\\d+x\\d+(\\s*,\\s*\\d+x\\d+)*\\s*$" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="300x250,728x90" />
+            <p class="text-xs text-gray-600 mt-2">Підтримується список через кому.</p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium mb-1">Мінімальний CPM</label>
-              <input name="minCpm" type="number" step="0.01" min="0" value="0" required class="mt-1 w-full border rounded p-2" />
+              <label class="block text-sm font-medium mb-2 text-gray-900">Мінімальний CPM</label>
+              <input name="minCpm" type="number" step="0.01" min="0" value="0" required class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1">Максимальний CPM</label>
-              <input name="maxCpm" type="number" step="0.01" min="0" class="mt-1 w-full border rounded p-2" />
+              <label class="block text-sm font-medium mb-2 text-gray-900">Максимальний CPM</label>
+              <input name="maxCpm" type="number" step="0.01" min="0" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium mb-1">GEO (через кому)</label>
-              <input name="geo" placeholder="US,UA,PL" class="mt-1 w-full border rounded p-2" />
+              <label class="block text-sm font-medium mb-2 text-gray-900">GEO (через кому)</label>
+              <input name="geo" placeholder="US,UA,PL" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1">Тип реклами</label>
-              <select name="adType" class="mt-1 w-full border rounded p-2">
+              <label class="block text-sm font-medium mb-2 text-gray-900">Тип реклами</label>
+              <select name="adType" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="banner">banner</option>
                 <option value="native">native</option>
                 <option value="video">video</option>
@@ -65,34 +116,37 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1">Частота показів на користувача (на день)</label>
-            <input name="frequencyPerDay" type="number" min="0" value="0" class="mt-1 w-full border rounded p-2" />
+            <label class="block text-sm font-medium mb-2 text-gray-900">Частота показів на користувача (на день)</label>
+            <input name="frequencyPerDay" type="number" min="0" value="0" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1">Посилання переходу (optional)</label>
-            <input name="clickUrl" type="url" placeholder="https://example.com" class="mt-1 w-full border rounded p-2" />
+            <label class="block text-sm font-medium mb-2 text-gray-900">Посилання переходу (optional)</label>
+            <input name="clickUrl" type="url" placeholder="https://example.com" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1">Inline HTML creative (optional)</label>
-            <textarea name="html" rows="4" class="mt-1 w-full border rounded p-2"
+            <label class="block text-sm font-medium mb-2 text-gray-900">Inline HTML creative (optional)</label>
+            <textarea name="html" rows="4" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder='&lt;a href="https://…"&gt;&lt;img …&gt;&lt;/a&gt;'></textarea>
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1">Файл креатива (PNG/JPG/GIF, optional)</label>
-            <input id="file" name="creative" type="file" accept="image/*" class="mt-1 w-full" />
-            <div id="preview" class="mt-2 hidden">
-              <img alt="preview" class="max-h-40 rounded border"/>
+            <label class="block text-sm font-medium mb-2 text-gray-900">Файл креатива (PNG/JPG/GIF, optional)</label>
+            <input id="file" name="creative" type="file" accept="image/*" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 file:bg-gray-600 file:border-0 file:rounded file:px-3 file:py-1 file:text-white file:hover:bg-gray-500 file:transition-colors" />
+            <div id="preview" class="mt-3 hidden">
+              <img alt="preview" class="max-h-40 rounded-lg border border-gray-300" />
             </div>
-            <p class="text-xs text-slate-500 mt-1">Якщо заповнено HTML — файл не обов’язковий.</p>
+            <p class="text-xs text-gray-600 mt-2">Якщо заповнено HTML — файл не обов'язковий.</p>
           </div>
 
-          <div id="msg" class="text-sm"></div>
+          <div id="msg" class="text-sm" aria-live="polite"></div>
 
-          <button id="submitBtn" class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">
-            Створити
+          <button id="submitBtn" class="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg">
+            <span class="flex items-center justify-center">
+              <span class="mr-2">✨</span>
+              Створити рекламу
+            </span>
           </button>
         </form>
       `;
@@ -105,142 +159,96 @@
       const fileInput = $('#file');
       const previewBox = $('#preview');
       const previewImg = $('#preview img');
-
-      function postResize() {
-        const h = document.documentElement.scrollHeight;
-        parent.postMessage({ type: 'resize', height: h }, '*');
+      let raf = 0;
+      const resize = () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          const h = Math.ceil(wrap.getBoundingClientRect().height) + 16; 
+          parent.postMessage({ type: 'resize', height: h }, '*');
+        });
+      };
+      new ResizeObserver(resize).observe(wrap);
+      window.addEventListener('load', resize);
+      tw.addEventListener('load', resize);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(resize).catch(() => {});
       }
-      new ResizeObserver(postResize).observe(document.body);
-      window.addEventListener('load', postResize);
 
       fileInput.addEventListener('change', () => {
         const f = fileInput.files && fileInput.files[0];
         if (!f) { previewBox.classList.add('hidden'); return; }
-        if (f.size > 10 * 1024 * 1024) {
-          fileInput.value = '';
-          showError('Файл завеликий (макс 10MB).');
-          return;
-        }
+        if (!f.type.startsWith('image/')) { fileInput.value=''; msg.textContent='Файл має бути зображенням.'; return; }
+        if (f.size > 10 * 1024 * 1024) { fileInput.value=''; msg.textContent='Файл завеликий (макс 10MB).'; return; }
         if (previewImg.src && previewImg.src.startsWith('blob:')) {
           try { URL.revokeObjectURL(previewImg.src); } catch {}
         }
-        const url = URL.createObjectURL(f);
-        previewImg.src = url;
+        previewImg.src = URL.createObjectURL(f);
         previewBox.classList.remove('hidden');
-        postResize();
+        resize();
       });
-
-      function showError(text) {
-        msg.className = 'text-red-600';
-        msg.textContent = text;
-      }
-      function showSuccess(text) {
-        msg.className = 'text-emerald-600';
-        msg.textContent = text;
-      }
 
       const SIZE_LIST_RE = /^\s*\d+x\d+(?:\s*,\s*\d+x\d+)*\s*$/i;
       const BAD_HTML_RE = /<script\b|on\w+\s*=|javascript:/i;
 
       form.addEventListener('input', (e) => {
-        if (!e.target) return;
-
-        if (e.target.name === 'sizes') {
-          e.target.setCustomValidity(SIZE_LIST_RE.test(e.target.value) ? '' : 'Приклад: 300x250,300x600');
-        }
-
-        if (e.target.name === 'geo') {
-          e.target.value = e.target.value
-            .split(',')
-            .map(s => s.trim().toUpperCase())
-            .filter(Boolean)
-            .join(',');
-        }
-
-        if (e.target.name === 'maxCpm' || e.target.name === 'minCpm') {
+        const t = e.target;
+        if (!t) return;
+        if (t.name === 'sizes') t.setCustomValidity(SIZE_LIST_RE.test(t.value) ? '' : 'Приклад: 300x250,300x600');
+        if (t.name === 'geo') t.value = t.value.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).join(',');
+        if (t.name === 'maxCpm' || t.name === 'minCpm') {
           const min = parseFloat(form.minCpm.value || '0');
           const max = parseFloat(form.maxCpm.value || '');
-          if (!isNaN(min) && !isNaN(max) && max > 0 && max < min) {
-            form.maxCpm.setCustomValidity('Max CPM має бути ≥ Min CPM');
-          } else {
-            form.maxCpm.setCustomValidity('');
-          }
+          form.maxCpm.setCustomValidity(!Number.isNaN(min) && !Number.isNaN(max) && max > 0 && max < min ? 'Max CPM має бути ≥ Min CPM' : '');
         }
+        resize();
       });
 
       form.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         msg.textContent = '';
         submitBtn.disabled = true;
-
         try {
           const fd = new FormData(form);
+          const nameVal = (form.elements.namedItem('name')?.value || '').trim();
+          const sizesVal = (form.elements.namedItem('sizes')?.value || '').trim();
+          if (!nameVal || !sizesVal) { msg.textContent='name і sizes обовʼязкові'; submitBtn.disabled=false; return; }
+          if (!SIZE_LIST_RE.test(sizesVal)) { msg.textContent='sizes: приклад 300x250,300x600'; submitBtn.disabled=false; return; }
+          fd.set('name', nameVal); fd.set('sizes', sizesVal);
 
-          const nameVal  = (form.elements.namedItem('name')  || { value: '' }).value?.trim?.() ?? '';
-          const sizesVal = (form.elements.namedItem('sizes') || { value: '' }).value?.trim?.() ?? '';
-          if (!nameVal || !sizesVal) {
-            showError('name і sizes обовʼязкові'); submitBtn.disabled = false; return;
-          }
-          if (!SIZE_LIST_RE.test(sizesVal)) {
-            showError('sizes: приклад 300x250,300x600'); submitBtn.disabled = false; return;
-          }
-          fd.set('name', nameVal);
-          fd.set('sizes', sizesVal);
-
-          const htmlVal = (form.elements.namedItem('html') || { value: '' }).value?.trim?.() ?? '';
-          const clickVal = (form.elements.namedItem('clickUrl') || { value: '' }).value?.trim?.() ?? '';
+          const htmlVal = (form.elements.namedItem('html')?.value || '').trim();
+          const clickVal = (form.elements.namedItem('clickUrl')?.value || '').trim();
           const hasFile = fileInput && fileInput.files && fileInput.files[0];
 
-          if (!htmlVal && !hasFile) {
-            showError('Додайте HTML креатив або файл зображення.'); submitBtn.disabled = false; return;
-          }
+          if (!htmlVal && !hasFile) { msg.textContent='Додайте HTML або файл зображення.'; submitBtn.disabled=false; return; }
           if (htmlVal) {
-            if (BAD_HTML_RE.test(htmlVal)) {
-              showError('HTML містить заборонений вміст (script/inline handlers/javascript:).'); submitBtn.disabled = false; return;
-            }
+            if (BAD_HTML_RE.test(htmlVal)) { msg.textContent='HTML містить заборонений вміст.'; submitBtn.disabled=false; return; }
             fd.set('html', htmlVal);
           }
-          if (clickVal && !/^https?:\/\//i.test(clickVal)) {
-            showError('Посилання має починатися з http/https'); submitBtn.disabled = false; return;
-          }
+          if (clickVal && !/^https?:\/\//i.test(clickVal)) { msg.textContent='Посилання має починатися з http/https'; submitBtn.disabled=false; return; }
 
           const geoEl = form.elements.namedItem('geo');
           if (geoEl && geoEl.value != null) {
-            const g = String(geoEl.value)
-              .split(',').map(s => s.trim().toUpperCase()).filter(Boolean).join(',');
+            const g = String(geoEl.value).split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).join(',');
             fd.set('geo', g);
           }
 
-          const res = await fetch(form.action, {
-            method: 'POST',
-            body: fd,
-            credentials: 'include',
-          });
-
+          const res = await fetch(form.action, { method:'POST', body:fd, credentials:'include' });
           const ct = res.headers.get('content-type') || '';
           const raw = await res.text();
-          let data = null;
-          if (ct.includes('application/json')) { try { data = JSON.parse(raw); } catch {} }
+          let data = null; if (ct.includes('application/json')) { try { data = JSON.parse(raw); } catch {} }
 
           if (!res.ok) {
-            const message = (data && (data.message || data.error)) || raw || 'Помилка створення line item';
-            showError(message);
+            msg.textContent = (data && (data.message || data.error)) || raw || 'Помилка створення line item';
           } else {
             const id = data?.id ?? (() => { try { return JSON.parse(raw).id; } catch { return null; } })();
-            if (id) {
-              msg.className = 'text-emerald-600';
-              msg.innerHTML = `Створено! ID: <code>${id}</code> · <button id="copyId" class="underline">скопіювати</button>`;
-              ($('#copyId'))?.addEventListener('click', () => navigator.clipboard.writeText(String(id)));
-            } else {
-              showSuccess('Ваш line item створено. Дякуємо!');
-            }
+            msg.innerHTML = id
+              ? `Створено! ID: <code>${id}</code>`
+              : 'Ваш line item створено. Дякуємо!';
             form.reset();
-            previewBox.classList.add('hidden');
-            if (previewImg.src && previewImg.src.startsWith('blob:')) { try { URL.revokeObjectURL(previewImg.src); } catch {} previewImg.src = ''; }
-            postResize();
+            if (previewImg.src && previewImg.src.startsWith('blob:')) { try { URL.revokeObjectURL(previewImg.src); } catch {} }
+            previewImg.src = ''; previewBox.classList.add('hidden');
+            resize();
           }
-        } catch {
-          showError('Мережева помилка. Спробуйте ще раз.');
         } finally {
           submitBtn.disabled = false;
         }

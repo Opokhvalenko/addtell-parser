@@ -13,13 +13,10 @@ function escapeHtml(s: string): string {
 
 function loadTemplate(): string {
   const here = dirname(fileURLToPath(import.meta.url));
-
   const distTpl = resolve(here, "../templates/create-lineitem.html");
   if (existsSync(distTpl)) return readFileSync(distTpl, "utf8");
-
   const srcTpl = resolve(process.cwd(), "src/modules/adserver/ssr/templates/create-lineitem.html");
   if (existsSync(srcTpl)) return readFileSync(srcTpl, "utf8");
-
   return `<!doctype html>
 <meta charset="utf-8">
 <title>Create line item</title>

@@ -18,7 +18,6 @@ const healthDbRoute: FastifyPluginAsync = async (app) => {
         if (hasRunCommandRaw(app.prisma)) {
           await app.prisma.$runCommandRaw({ ping: 1 });
         } else {
-          // fallback для не-Mongo провайдерів
           await app.prisma.feed.count();
         }
         const ms = Date.now() - started;
@@ -27,7 +26,6 @@ const healthDbRoute: FastifyPluginAsync = async (app) => {
       } catch (err) {
         const ms = Date.now() - started;
         app.log.error({ err, ms }, "db health failed");
-        // 503 логічніший для health
         throw app.httpErrors.serviceUnavailable("DB not reachable");
       }
     },

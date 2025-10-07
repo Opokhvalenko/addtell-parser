@@ -1,18 +1,15 @@
 name: adtell-stack
 
 services:
-  # ---------- CLICKHOUSE ----------
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     container_name: clickhouse
     restart: unless-stopped
-    ports:
-      - "8123:8123"
-      - "9000:9000"
+    ports: ["8123:8123","9000:9000"]
     environment:
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-mydb}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-mypassword}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:?set-in-.env}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:?set-in-.env}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set-in-.env}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
       interval: 10s
@@ -24,27 +21,24 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
 
-  # ---------- TABIX UI ----------
   tabix:
     image: spoonest/clickhouse-tabix-web-client:latest
     container_name: tabix
-    platform: linux/amd64        
+    platform: linux/amd64
     restart: unless-stopped
-    ports:
-      - "8080:80"
+    ports: ["8080:80"]
     environment:
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: 8123
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-mypassword}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:?set-in-.env}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set-in-.env}
     depends_on:
       clickhouse:
         condition: service_healthy
 
-  # ---------- BACKEND ----------
   backend:
     build:
-      context: .                 
+      context: .
       dockerfile: Dockerfile
     container_name: backend
     restart: unless-stopped
@@ -55,26 +49,25 @@ services:
       HOST: 0.0.0.0
       UPLOADS_DIR: /app/uploads
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      APP_ORIGIN: http://localhost:5173
+      APP_ORIGIN: ${APP_ORIGIN:?set-in-.env}
+      DATABASE_URL: ${DATABASE_URL:?set-in-.env}
 
-      CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-mydb}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-mypassword}
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:?set-in-.env}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:?set-in-.env}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:?set-in-.env}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set-in-.env}
 
-    ports:
-      - "3000:3000"
+    ports: ["3000:3000"]
     volumes:
-      - ./uploads:/app/uploads   
-      - ./public:/app/public     
+      - ./uploads:/app/uploads
+      - ./public:/app/public
     user: "node"
-    read_only: true              
+    read_only: true
     tmpfs: [/tmp]
     depends_on:
       clickhouse:
         condition: service_healthy
 
-  # ---------- MONGO (опційно, профіль local-db) ----------
   mongo-keyfile:
     image: alpine:3.20
     command: >
@@ -99,14 +92,13 @@ services:
         condition: service_completed_successfully
     command: ["mongod","--replSet","rs0","--bind_ip_all","--keyFile","/data/config/keyfile"]
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: root
-    ports:
-      - "27017:27017"
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-root}
+    ports: ["27017:27017"]
     volumes:
       - mongo_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' -u root -p root --authenticationDatabase admin | grep 1 || exit 1"]
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' -u $${MONGO_INITDB_ROOT_USERNAME} -p $${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin | grep 1 || exit 1"]
       interval: "5s"
       timeout: "5s"
       retries: 60
@@ -125,7 +117,7 @@ services:
       - |
         set -e
         echo "Ensuring replica set is initiated..."
-        mongosh --quiet --host mongo -u root -p root --authenticationDatabase admin --eval '
+        mongosh --quiet --host mongo -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval '
           try { const s = rs.status(); print("Replica set already exists:", s.set); }
           catch (e) { print("Replica set not initiated, initiating...");
             rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] }); }

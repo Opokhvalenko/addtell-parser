@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind v4 plugin directive */
+@plugin "@tailwindcss/forms";
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind v4 plugin directive */
+@plugin "@tailwindcss/typography";
+
+:root {
+  color-scheme: light dark;
+}

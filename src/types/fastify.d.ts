@@ -1,56 +1,50 @@
-import "fastify";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import type { PrismaClient } from "@prisma/client";
 import type { CronStatus } from "../cron/types";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Registry, Counter } from "prom-client";
+import type { Config } from "../config/schema";
 
 declare module "fastify" {
   interface FastifyInstance {
-    config: {
-      NODE_ENV?: "development" | "test" | "production";
-      LOG_LEVEL?: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
-      HOST?: string;
-      PORT: number;
-      TRUST_PROXY?: number | boolean | string;
-
-      JWT_SECRET: string;
-      COOKIE_SECRET: string;
-      COOKIE_SECURE?: "true" | "false";
-
-      APP_ORIGIN?: string;
-      CORS_ORIGINS?: string;
-
-      ADMIN_TOKEN?: string;
-      UPLOADS_DIR: string;
-      DEFAULT_FEED_URL?: string;
-      DATABASE_URL: string;
-
-      CLICKHOUSE_URL?: string;
-      CLICKHOUSE_DB?: string;
-      CLICKHOUSE_USER?: string;
-      CLICKHOUSE_PASSWORD?: string;
-      CLICKHOUSE_TABLE?: string;
-
-      CH_BATCH_SIZE?: string | number;
-      CH_FLUSH_MS?: string | number;
-    };
-
+    config: Config;
     clickhouse?: ClickHouseClient;
-
+    analyticsRoutesRegistered?: boolean;
     metrics?: {
       register: Registry;
       ingestCounter: Counter<string>;
     };
-
     prisma: PrismaClient;
+
     pluginLoaded?(pluginName: string): void;
     cronFeedsRun?(onlyUrl?: string): Promise<void>;
     cronFeedsStatus?(): CronStatus;
+
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+
+    httpErrors: {
+      badRequest: (message: string) => Error;
+      unauthorized: (message?: string) => Error;
+      forbidden: (message?: string) => Error;
+      notFound: (message?: string) => Error;
+      conflict: (message?: string) => Error;
+      payloadTooLarge: (message?: string) => Error;
+      badGateway: (message: string) => Error;
+      serviceUnavailable: (message?: string) => Error;
+      internalServerError: (message?: string) => Error;
+    };
+  }
+  interface FastifyContextConfig {
+    public?: boolean;
   }
 
   interface FastifyRequest {
     cookies: Record<string, string | undefined>;
     uid?: string;
     user?: { id: string; email?: string };
+
+    auditStartTime?: number;
+    auditIP?: string;
+    auditUserAgent?: string;
   }
 }

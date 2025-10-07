@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
+
 import { normalizeError } from "../../utils/errors.js";
-import { getOrParseFeed } from "./feedService.js";
+import { getOrParseFeedService } from "./feedService.js";
+import articleRoutes from "./routes.article.js";
 import {
   type FeedItemResponse,
   type FeedQuery,
@@ -31,22 +33,24 @@ function normalizeItem(i: unknown): FeedItemResponse {
 }
 
 const feedRoutes: FastifyPluginAsync = async (app) => {
+  app.register(articleRoutes);
+
   app.get<{ Querystring: FeedQuery; Reply: FeedResponse }>(
     "/feed",
     { schema: { querystring: FeedQuerySchema, response: { 200: FeedResponseSchema } } },
-    async (req, reply) => {
+    async (req, _reply) => {
       app.log.info({ query: req.query }, "GET /feed: incoming");
 
       const cfgUrl = app.config.DEFAULT_FEED_URL;
       const url = typeof req.query.url === "string" ? req.query.url : cfgUrl;
       if (!url) {
-        throw app.httpErrors.badRequest("DEFAULT_FEED_URL is not set");
+        throw new Error("DEFAULT_FEED_URL is not set");
       }
 
       const force = req.query.force === "1";
 
       try {
-        const data = await getOrParseFeed(app, url, force);
+        const data = await getOrParseFeedService(app, url, force);
 
         let title: string | undefined;
         if (data && typeof (data as { title?: unknown }).title === "string") {
@@ -67,7 +71,7 @@ const feedRoutes: FastifyPluginAsync = async (app) => {
       } catch (e: unknown) {
         const err = normalizeError(e);
         app.log.error({ url, errName: err.name, errMsg: err.message }, "GET /feed: failed");
-        return reply.code(502).send({ url, items: [], title: "Failed to fetch feed" });
+        throw new Error("Failed to fetch feed");
       }
     },
   );

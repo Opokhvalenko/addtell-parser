@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-
 export function impressionRepo(app: FastifyInstance) {
   return {
     add: (uid: string, lineItemId: string) =>

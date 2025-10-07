@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-
 export function lineItemRepo(app: FastifyInstance) {
   return {
     findCandidates: (opts: { size: string; adType: string }) =>

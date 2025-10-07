@@ -1,6 +1,5 @@
 export type Filter<T> = { name: string; run: (items: T[]) => T[] };
 export type Verdict<T> = { winner?: T | undefined; trace: { name: string; left: number }[] };
-
 export async function runPipeline<T>(items: T[], filters: Filter<T>[]): Promise<Verdict<T>> {
   const trace: Verdict<T>["trace"] = [];
   let current = items.slice();

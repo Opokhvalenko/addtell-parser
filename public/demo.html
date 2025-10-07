@@ -4,10 +4,11 @@
 <body style="font:14px system-ui; padding:20px">
   <h1>Adslot demo</h1>
   <p>Нижче блок 300x250, рендер у Shadow DOM:</p>
-  <div class="ad-slot" data-size="300x250" data-type="banner"></div>
 
-  <!-- якщо фронт і бек на різних доменах, додай data-endpoint="http://localhost:3001" -->
-  <!-- <div class="ad-slot" data-size="300x250" data-type="banner" data-endpoint="http://localhost:3001"></div> -->
+  <div id="ad-top" class="ad-slot" data-size="300x250" data-type="banner"></div>
 
-  <script type="module" src="/adslot.js"></script>
+  <link rel="stylesheet" href="/public/assets/tw-embed.css?v=1">
+
+  
+  <script type="module" src="/public/adslot.js"></script>
 </body>
