@@ -55,30 +55,29 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register((await import("./plugins/rate-limit.plugin.js")).default);
   await app.register((await import("./plugins/audit-logging.plugin.js")).default);
 
-  // 3) core-auth (JWT) → потім одразу роути
+  // core-auth раніше за всі роути
   await app.register((await import("./plugins/jwt.plugin.js")).default);
-  await app.register((await import("./modules/auth/routes.js")).default, { prefix: "/api" });
+  await app.register((await import("./plugins/auth.plugin.js")).default);
 
-  // 4) аналітика (один раз)
+  // аналітика (один раз)
   await app.register((await import("./plugins/analytics.plugin.js")).default);
 
-  // 5) фіди — реєструємо роутер напряму
-  await app.register((await import("./modules/feed/routes.js")).default, { prefix: "/api" });
-
-  // 6) інші плагіни через автолоад (ігноруємо обгортки роутів)
+  // інші плагіни через автолоад (ігноруємо ті, що вже підняли)
   await app.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     ignorePattern:
-      /^(otel|health|security-headers|rate-limit|audit-logging|jwt|auth|analytics|cookie|feed)\.plugin\.(js|mjs|cjs)$/i,
+      /^(otel|health|security-headers|rate-limit|audit-logging|jwt|auth|analytics|cookie)\.plugin\.(js|mjs|cjs)$/i,
     encapsulate: true,
   });
 
   // демо-роути
   await app.register((await import("./routes/beautiful-ad.js")).default);
 
+  // друк карти маршрутів (локально завжди; у прод — якщо PRINT_ROUTES=1)
   if (!isProd || process.env.PRINT_ROUTES === "1") {
     await app.ready();
-    app.log.info("\n" + app.printRoutes());
+    app.log.info(`\n${app.printRoutes()}`);
   }
+
   return app;
 }
