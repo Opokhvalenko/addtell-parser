@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import { normalizeError } from "../../utils/errors.js";
+import { getPrisma } from "../../utils/prisma.js";
 import { withRetry } from "../../utils/retry.js";
 import type { RssItem } from "./feedParser.js";
 import { parseFeed } from "./feedParser.js";
@@ -33,7 +35,11 @@ function toCreateCore(i: InputItem): FeedItemCreateCore {
 }
 
 export async function getOrParseFeed(app: FastifyInstance, url: string, force = false) {
-  const existing = await app.prisma.feed.findUnique({ where: { url }, include: { items: true } });
+  const prisma = getPrisma(app);
+  const existing = await prisma.feed.findUnique({
+    where: { url },
+    include: { items: true },
+  });
   if (existing && !force) {
     app.log.info({ url, items: existing.items.length }, "feed: return cached");
     return { title: existing.title, items: existing.items };
@@ -59,7 +65,7 @@ export async function getOrParseFeed(app: FastifyInstance, url: string, force = 
 
     app.log.info({ url, title: raw.title, count: parsedItems.length }, "feed: parsed");
 
-    const feed = await app.prisma.feed.upsert({
+    const feed = await prisma.feed.upsert({
       where: { url },
       update: { title: raw.title ?? null },
       create: { url, title: raw.title ?? null },
@@ -71,7 +77,7 @@ export async function getOrParseFeed(app: FastifyInstance, url: string, force = 
     let updated = 0;
     for (const d of data) {
       try {
-        await app.prisma.feedItem.upsert({
+        await prisma.feedItem.upsert({
           where: { feedId_link: { feedId: d.feedId as string, link: d.link } },
           update: {
             ...(d.title !== undefined ? { title: d.title } : {}),
@@ -82,13 +88,20 @@ export async function getOrParseFeed(app: FastifyInstance, url: string, force = 
           create: d,
         });
         created += 1;
-      } catch (e) {
+      } catch (error) {
         updated += 1;
-        app.log.debug({ e, link: d.link }, "feed: upsert item failed, counted as updated");
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        app.log.debug(
+          { error: errorMessage, link: d.link },
+          "feed: upsert item failed, counted as updated",
+        );
       }
     }
 
-    const fresh = await app.prisma.feed.findUnique({ where: { url }, include: { items: true } });
+    const fresh = await prisma.feed.findUnique({
+      where: { url },
+      include: { items: true },
+    });
     app.log.info({ url, created, updated, items: fresh?.items.length ?? 0 }, "feed: stored");
 
     return { title: fresh?.title ?? null, items: fresh?.items ?? [] };
@@ -102,5 +115,15 @@ export async function getOrParseFeed(app: FastifyInstance, url: string, force = 
     }
     app.log.error({ url, err: (err as Error).message }, "feed: parse failed and no cache");
     throw err;
+  }
+}
+
+export async function getOrParseFeedService(app: FastifyInstance, url: string, force: boolean) {
+  try {
+    return await getOrParseFeed(app, url, force);
+  } catch (error: unknown) {
+    const normalizedError = normalizeError(error);
+    app.log.error({ url, error: normalizedError }, "Failed to get or parse feed");
+    throw normalizedError;
   }
 }

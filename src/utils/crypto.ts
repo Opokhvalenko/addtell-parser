@@ -1,9 +1,8 @@
 import bcrypt from "bcryptjs";
+import type { Config } from "../config/schema.js";
 
-const ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 12);
-
-export async function hashPassword(plain: string) {
-  return bcrypt.hash(plain, ROUNDS);
+export async function hashPassword(plain: string, config: Config) {
+  return bcrypt.hash(plain, config.BCRYPT_ROUNDS);
 }
 export async function verifyPassword(plain: string, hash: string) {
   return bcrypt.compare(plain, hash);

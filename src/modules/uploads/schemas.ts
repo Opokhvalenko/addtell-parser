@@ -1,6 +1,5 @@
 import type { Static } from "@sinclair/typebox";
 import { Type } from "@sinclair/typebox";
-
 export const UploadResponseSchema = Type.Object(
   {
     url: Type.String(),
@@ -10,5 +9,4 @@ export const UploadResponseSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-
 export type UploadResponse = Static<typeof UploadResponseSchema>;

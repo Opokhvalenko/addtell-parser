@@ -1,39 +1,43 @@
-import retry from "async-retry";
-
+import * as retry from "retry";
 export async function withRetry<T>(
-  fn: () => Promise<T>,
-  retriesOrNote?: number | string,
-  minTimeout?: number,
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  minTimeout: number = 200,
 ): Promise<T> {
-  const retries = typeof retriesOrNote === "number" ? retriesOrNote : 3;
-
-  return retry(
-    async (bail) => {
+  const operationWithRetry = retry.operation({
+    retries: maxRetries,
+    factor: 2,
+    minTimeout,
+    maxTimeout: 1500,
+  });
+  return new Promise((resolve, reject) => {
+    operationWithRetry.attempt(async (_currentAttempt: number) => {
       try {
-        return await fn();
-      } catch (err) {
+        const result = await operation();
+        resolve(result);
+      } catch (error) {
         const statusCode =
-          typeof err === "object" &&
-          err !== null &&
-          "statusCode" in (err as Record<string, unknown>)
-            ? (err as { statusCode?: unknown }).statusCode
+          typeof error === "object" &&
+          error !== null &&
+          "statusCode" in (error as Record<string, unknown>)
+            ? (error as { statusCode?: unknown }).statusCode
             : undefined;
-
         if (typeof statusCode === "number" && statusCode < 500) {
-          const nonRetryable =
-            err instanceof Error
-              ? err
+          const nonRetryableError =
+            error instanceof Error
+              ? error
               : new Error(`Non-retryable error (statusCode ${statusCode})`);
-          if (!(err instanceof Error)) {
-            (nonRetryable as Error & { cause?: unknown }).cause = err;
+          if (!(error instanceof Error)) {
+            (nonRetryableError as Error & { cause?: unknown }).cause = error;
           }
-          bail(nonRetryable);
-          return undefined as never;
+          reject(nonRetryableError);
+          return;
         }
-
-        throw err instanceof Error ? err : new Error(String(err));
+        if (operationWithRetry.retry(error as Error)) {
+          return;
+        }
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
-    },
-    { retries, factor: 2, minTimeout: minTimeout ?? 200, maxTimeout: 1500 },
-  );
+    });
+  });
 }

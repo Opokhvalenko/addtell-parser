@@ -11,7 +11,6 @@ type CreateArgs = {
   html?: string | null;
   meta?: Prisma.JsonValue;
 };
-
 export function creativeRepo(app: FastifyInstance) {
   return {
     create: (data: CreateArgs) =>

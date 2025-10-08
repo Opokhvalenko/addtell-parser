@@ -9,23 +9,18 @@ declare module "fastify" {
     };
   }
 }
-
 export default fp(
   async (app) => {
     if (app.metrics) return;
-
     const register = new client.Registry();
     client.collectDefaultMetrics({ register });
-
     const ingestCounter = new client.Counter({
       name: "ingest_events_total",
       help: "Total ingested events",
       registers: [register],
       labelNames: ["source"],
     });
-
     app.decorate("metrics", { register, ingestCounter });
-
     app.get("/metrics", async (_req, reply) => {
       return reply.type(register.contentType).send(await register.metrics());
     });

@@ -6,7 +6,6 @@ function extractString(v: unknown): string | undefined {
   }
   return undefined;
 }
-
 export function getStr(
   body: Record<string, unknown>,
   name: string,
@@ -15,7 +14,6 @@ export function getStr(
   const raw = extractString(body[name]);
   return raw !== undefined ? raw : fallback;
 }
-
 export function getCSV(body: Record<string, unknown>, name: string): string[] {
   const s = getStr(body, name) ?? "";
   return s
@@ -23,7 +21,6 @@ export function getCSV(body: Record<string, unknown>, name: string): string[] {
     .map((x) => x.trim())
     .filter(Boolean);
 }
-
 export function getNumOrNull(body: Record<string, unknown>, name: string): number | null {
   const s = getStr(body, name);
   if (s == null || s === "") return null;

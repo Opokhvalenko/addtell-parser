@@ -1,4 +1,4 @@
-import { fmtHMS } from "../lib/time.js";
+import { formatDate } from "../lib/time.js";
 import type { CronConfig, CronLastError, CronStatus } from "./types.js";
 
 export function createCronState(cfg: CronConfig) {
@@ -62,7 +62,7 @@ export function createCronState(cfg: CronConfig) {
         cycles,
         processStartedAt,
         uptimeMs,
-        uptimeHuman: fmtHMS(uptimeMs),
+        uptimeHuman: formatDate(new Date(uptimeMs)),
 
         lastStartedAt,
         lastFinishedAt,

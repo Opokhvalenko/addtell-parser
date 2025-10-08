@@ -10,7 +10,7 @@ export type RssItem = {
   guid?: string;
 };
 
-const parser = new Parser<unknown, RssItem>({
+const parser = new Parser({
   timeout: 15_000,
   requestOptions: {
     headers: {

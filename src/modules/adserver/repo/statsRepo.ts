@@ -1,13 +1,10 @@
 import type { FastifyInstance } from "fastify";
-
 export function statsRepo(app: FastifyInstance) {
   return {
     async today() {
       const now = new Date();
       const from = new Date(now);
-      // агрегація за “сьогодні” (UTC-північ)
       from.setUTCHours(0, 0, 0, 0);
-
       const [requests, filled, empty, clicks, impressions, avg] = await Promise.all([
         app.prisma.adEvent.count({ where: { kind: "bid_request", at: { gte: from } } }),
         app.prisma.adEvent.count({ where: { kind: "bid_filled", at: { gte: from } } }),
@@ -19,7 +16,6 @@ export function statsRepo(app: FastifyInstance) {
           where: { kind: "bid_filled", at: { gte: from } },
         }),
       ]);
-
       return {
         period: { from: from.toISOString(), to: now.toISOString() },
         requests,

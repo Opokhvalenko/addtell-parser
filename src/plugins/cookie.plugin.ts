@@ -1,24 +1,21 @@
 import { randomUUID } from "node:crypto";
-import cookie from "@fastify/cookie";
 import fp from "fastify-plugin";
+
+declare module "fastify" {
+  interface FastifyRequest {
+    uid?: string;
+  }
+}
 
 const UID_COOKIE = "uid";
 
-type CfgExtra = {
-  COOKIE_SECURE?: "true" | "false";
-  APP_ORIGIN?: string;
-};
+type CfgExtra = { COOKIE_SECURE?: "true" | "false"; APP_ORIGIN?: string };
 
 export default fp(
   async (app) => {
-    const secret = app.config.COOKIE_SECRET ?? app.config.JWT_SECRET;
-    await app.register(cookie, { secret, hook: "onRequest" });
-
     const cfg = app.config as typeof app.config & CfgExtra;
-
     const isProd = cfg.NODE_ENV === "production";
     const secureCookies = isProd && cfg.COOKIE_SECURE !== "false";
-
     const sameSite: "lax" | "none" =
       isProd && !(cfg.APP_ORIGIN ?? "").includes("localhost") ? "none" : "lax";
 
@@ -42,7 +39,6 @@ export default fp(
           }
         }
       }
-
       if (!id) {
         id = randomUUID();
         reply.setCookie(UID_COOKIE, id, {
@@ -54,9 +50,8 @@ export default fp(
           signed: true,
         });
       }
-
       req.uid = id;
     });
   },
-  { name: "cookie" },
+  { name: "uid-cookie", dependencies: ["jwt"] },
 );

@@ -1,26 +1,36 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
-declare module "fastify" {
-  interface FastifyInstance {
-    clickhouse?: ClickHouseClient;
-  }
-}
+// тип для FastifyInstance (у .d.ts — див. крок 1)
+// тут нічого додатково не оголошуємо
 
-export default fp(
-  async (app) => {
-    const url = process.env.CLICKHOUSE_URL ?? "http://clickhouse:8123";
-    const username = process.env.CLICKHOUSE_USER ?? "default";
-    const password = process.env.CLICKHOUSE_PASSWORD ?? "mypassword";
-    const database = process.env.CLICKHOUSE_DB ?? "mydb";
+const plugin: FastifyPluginAsync = async (app) => {
+  // беремо значення з типізованого app.config
+  const {
+    CLICKHOUSE_URL: url,
+    CLICKHOUSE_USER: username,
+    CLICKHOUSE_PASSWORD: password,
+    CLICKHOUSE_DB: database,
+  } = app.config;
 
-    const ch = createClient({ url, username, password, database, request_timeout: 1500 });
-    try {
-      await ch.ping();
-      app.decorate("clickhouse", ch);
-      await ch.exec({ query: `CREATE DATABASE IF NOT EXISTS ${database}` });
-      await ch.exec({
-        query: `
+  const ch: ClickHouseClient = createClient({
+    url,
+    username,
+    password,
+    database,
+    request_timeout: 1500,
+  });
+
+  try {
+    await ch.ping();
+
+    app.decorate("clickhouse", ch);
+
+    await ch.exec({ query: `CREATE DATABASE IF NOT EXISTS ${database}` });
+
+    await ch.exec({
+      query: `
         CREATE TABLE IF NOT EXISTS ${database}.events
         (
           ts         DateTime        DEFAULT now(),
@@ -42,17 +52,14 @@ export default fp(
         ENGINE = MergeTree
         ORDER BY (date, hour, event, adapter, adUnitCode, bidder, creativeId)
       `,
-      });
-      app.addHook("onClose", async () => ch.close());
-      app.log.info({ url }, "ClickHouse connected");
-    } catch (err) {
-      app.log.warn({ err, url }, "ClickHouse unavailable — running without it");
-      try {
-        await ch.close();
-      } catch {
-        /* ignore */
-      }
-    }
-  },
-  { name: "clickhouse.plugin" },
-);
+    });
+
+    app.addHook("onClose", async () => ch.close());
+    app.log.info({ url }, "ClickHouse connected");
+  } catch (err) {
+    app.log.warn({ err, url }, "ClickHouse unavailable — running without it");
+    await ch.close().catch(() => {});
+  }
+};
+
+export default fp(plugin, { name: "clickhouse" });

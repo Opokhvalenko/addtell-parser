@@ -1,35 +1,55 @@
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import type { Prisma } from "@prisma/client";
+import { hash, verify } from "argon2";
 import type { FastifyInstance } from "fastify";
-import { hashPassword, verifyPassword } from "../../utils/crypto.js";
 
-const dummyHashPromise = hashPassword("__dummy__");
-const norm = (s: string) => s.trim().toLowerCase();
+function isPrismaKnownRequestError(e: unknown): e is Prisma.PrismaClientKnownRequestError {
+  return !!e && typeof e === "object" && "code" in e;
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  return await hash(password);
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  try {
+    return await verify(hash, password);
+  } catch {
+    return false;
+  }
+}
 
 export async function registerUser(app: FastifyInstance, email: string, password: string) {
   const passwordHash = await hashPassword(password);
+
   try {
     return await app.prisma.user.create({
-      data: { email: norm(email), passwordHash },
-      select: { id: true, email: true, createdAt: true },
+      data: {
+        email,
+        passwordHash,
+      },
     });
-  } catch (e) {
-    if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
-      throw app.httpErrors.conflict("Email already registered");
+  } catch (error: unknown) {
+    if (isPrismaKnownRequestError(error) && error.code === "P2002") {
+      throw new Error("Email already registered");
     }
-    throw e;
+    throw error instanceof Error ? error : new Error("Unknown error");
   }
 }
 
 export async function loginUser(app: FastifyInstance, email: string, password: string) {
-  const user = await app.prisma.user.findUnique({ where: { email: norm(email) } });
+  const user = await app.prisma.user.findUnique({
+    where: { email },
+  });
+
   if (!user) {
-    await verifyPassword(password, await dummyHashPromise);
-    throw app.httpErrors.unauthorized("Invalid credentials");
+    throw new Error("Invalid credentials");
   }
 
-  const ok = await verifyPassword(password, user.passwordHash);
-  if (!ok) throw app.httpErrors.unauthorized("Invalid credentials");
+  const isValid = await verifyPassword(password, user.passwordHash);
+  if (!isValid) {
+    throw new Error("Invalid credentials");
+  }
 
   const token = await app.jwt.sign({ id: user.id, email: user.email });
-  return { token, user: { id: user.id, email: user.email } };
+  return { token };
 }

@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
-
 export function metricsRepo(app: FastifyInstance) {
   return {
     add: (
@@ -22,7 +21,6 @@ export function metricsRepo(app: FastifyInstance) {
           extra: (data.extra ?? null) as Json,
         },
       }),
-
     incr: async (key: string, by = 1) => {
       const doc = await app.prisma.requestCounter.findUnique({ where: { key } });
       if (!doc) return app.prisma.requestCounter.create({ data: { key, value: by } });

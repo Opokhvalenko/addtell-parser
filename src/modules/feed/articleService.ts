@@ -179,13 +179,14 @@ export async function parseArticleByUrl(
         Accept: "text/html,application/xhtml+xml",
       },
     });
-  } catch (e) {
-    app.log.error({ url: inputUrl, err: e }, "article: network error");
-    throw app.httpErrors.badGateway("Failed to fetch article");
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    app.log.error({ url: inputUrl, error: errorMessage }, "article: network error");
+    throw new Error("Failed to fetch article");
   }
   if (!res.ok) {
     app.log.error({ url: inputUrl, status: res.status }, "article: fetch failed");
-    throw app.httpErrors.badGateway(`Upstream responded ${res.status}`);
+    throw new Error(`Upstream responded ${res.status}`);
   }
 
   const htmlRaw = await res.text();
