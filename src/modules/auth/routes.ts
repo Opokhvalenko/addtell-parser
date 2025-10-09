@@ -70,9 +70,18 @@ const routes: FastifyPluginAsync = async (app) => {
   app.get(
     "/auth/me",
     { preHandler: app.authenticate, schema: { response: { 200: MeResponseSchema } } },
-    async (req) => {
-      const token = await req.server.jwt.sign({ id: req.user.id, email: req.user.email });
-      return { id: req.user.id, email: req.user.email, token };
+    async (req, reply) => {
+      try {
+        const u = req.user as { id?: string; email?: string } | undefined;
+        if (!u?.id || !u?.email) return reply.unauthorized();
+        const token =
+          (req.cookies?.token as string | undefined) ||
+          (await reply.jwtSign({ id: u.id, email: u.email }));
+        return { id: u.id, email: u.email, token };
+      } catch (err) {
+        req.log.error({ err }, "/auth/me failed");
+        return reply.internalServerError();
+      }
     },
   );
 

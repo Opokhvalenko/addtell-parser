@@ -51,11 +51,17 @@ export default fp(
       "/docs",
       "/public",
       "/uploads",
+      "/assets/tw-embed.css",
+
+      // аналітика
       "/api/analytics",
+      "/api/stats",
+      "/api/adserver/stats",
+
+      // решта
       "/api/feed",
       "/api/article",
       "/create-lineitem",
-      "/assets/tw-embed.css",
     ];
 
     app.addHook("onRequest", async (req, reply) => {
