@@ -53,7 +53,8 @@ export default fp(
       "/uploads",
       "/api/analytics",
       "/api/feed",
-      "/create-lineitem", // ← сторінка форми
+      "/api/article",
+      "/create-lineitem",
       "/assets/tw-embed.css",
     ];
 
