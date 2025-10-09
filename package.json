@@ -8,6 +8,8 @@
     "dev": "tsx watch --clear-screen=false src/index.ts | pino-pretty",
     "start": "node dist/index.js",
     "start:prod": "node --enable-source-maps dist/index.js",
+    "clean": "rimraf dist",
+    "rebuild": "npm run clean && npm run build",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:format": "prisma format",

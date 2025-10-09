@@ -71,7 +71,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   });
 
   // демо-роути
-  await app.register((await import("./routes/beautiful-ad.js")).default);
+  await app.register((await import("./routes/beautiful-ad.js")).default, { prefix: "/api" });
 
   // друк карти маршрутів (локально завжди; у прод — якщо PRINT_ROUTES=1)
   if (!isProd || process.env.PRINT_ROUTES === "1") {
