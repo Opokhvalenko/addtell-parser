@@ -1,5 +1,4 @@
 import type { FromSchema } from "json-schema-to-ts";
-
 export const EnvSchema = {
   $id: "EnvSchema",
   type: "object",
@@ -7,6 +6,11 @@ export const EnvSchema = {
   properties: {
     PORT: { type: "integer", minimum: 1, maximum: 65535, default: 3000 },
     HOST: { type: "string", default: "0.0.0.0" },
+
+    PUBLIC_URL: { $ref: "#/$defs/url", default: "http://localhost:3000" },
+    SWAGGER_ENABLE: { type: "string" },
+    SWAGGER_UI: { type: "string" },
+
     UPLOADS_DIR: { type: "string", default: "./uploads" },
     DATABASE_URL: { $ref: "#/$defs/url" },
     DEFAULT_FEED_URL: { $ref: "#/$defs/url", default: "https://example.com/feed" },
@@ -25,13 +29,20 @@ export const EnvSchema = {
       enum: ["fatal", "error", "warn", "info", "debug", "trace", "silent"],
       default: "info",
     },
+
+    CLICKHOUSE_ENABLE: { type: "string", default: "true" },
+    CLICKHOUSE_SKIP_DDL: { type: "string", default: "true" },
     CLICKHOUSE_URL: { type: "string", default: "http://127.0.0.1:8123" },
     CLICKHOUSE_DB: { type: "string", default: "mydb" },
     CLICKHOUSE_USER: { type: "string", default: "default" },
     CLICKHOUSE_PASSWORD: { type: "string", default: "mypassword" },
     CLICKHOUSE_TABLE: { type: "string", default: "events" },
+    CLICKHOUSE_CONNECT_TIMEOUT_MS: { type: "integer", default: 3000 },
+    CLICKHOUSE_PING_TIMEOUT_MS: { type: "integer", default: 2000 },
+
     CH_BATCH_SIZE: { type: "integer", default: 1000 },
     CH_FLUSH_MS: { type: "integer", default: 5000 },
+
     CRON_ENABLE: { type: "string", default: "true" },
     FEEDS_OUT: { type: "string", default: "public/ads/feeds.json" },
     CRON_FEEDS_SCHEDULE: { type: "string", default: "*/10 * * * *" },
@@ -44,5 +55,4 @@ export const EnvSchema = {
   required: ["DATABASE_URL", "JWT_SECRET"],
   additionalProperties: false,
 } as const;
-
 export type Config = FromSchema<typeof EnvSchema>;
