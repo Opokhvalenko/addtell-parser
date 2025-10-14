@@ -79,7 +79,7 @@ export default fp(
               groupBy,
               metrics,
             });
-            return { ok: true, from: q.from, to: q.to, data };
+            return data;
           },
         );
 

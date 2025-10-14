@@ -45,24 +45,19 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     disableRequestLogging: !isProd,
   });
 
-  // 1) config
   await app.register(configPlugin);
 
-  // 2) базові плагіни
   await app.register((await import("./plugins/otel.plugin.js")).default);
   await app.register((await import("./plugins/health.plugin.js")).default);
   await app.register((await import("./plugins/security-headers.plugin.js")).default);
   await app.register((await import("./plugins/rate-limit.plugin.js")).default);
   await app.register((await import("./plugins/audit-logging.plugin.js")).default);
 
-  // core-auth раніше за роути
   await app.register((await import("./plugins/jwt.plugin.js")).default);
   await app.register((await import("./plugins/auth.plugin.js")).default);
 
-  // аналітика (реальні маршрути)
   await app.register((await import("./plugins/analytics.plugin.js")).default);
 
-  // ⛔️ ВАЖЛИВО: автолоад НЕ повинен підхоплювати stats-alias вдруге
   await app.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     ignorePattern:
@@ -70,13 +65,10 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     encapsulate: true,
   });
 
-  // alias ПІСЛЯ реєстрації аналітики (щоб hasRoute вже бачив основні маршрути)
   await app.register((await import("./plugins/stats-alias.plugin.js")).default);
 
-  // демо-роути
   await app.register((await import("./routes/beautiful-ad.js")).default, { prefix: "/api" });
 
-  // друк карти маршрутів
   if (!isProd || process.env.PRINT_ROUTES === "1") {
     await app.ready();
     app.log.info(`\n${app.printRoutes()}`);

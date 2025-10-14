@@ -26,8 +26,9 @@ const routes: FastifyPluginAsync = async (app) => {
     maxAge: 60 * 60 * 24 * 30,
   } as const;
 
+  // POST /api/auth/register
   app.post<{ Body: RegisterBody }>(
-    "/auth/register",
+    "/register",
     {
       config: { public: true },
       schema: { body: RegisterBodySchema, response: { 201: AuthResponseSchema } },
@@ -49,8 +50,9 @@ const routes: FastifyPluginAsync = async (app) => {
     },
   );
 
+  // POST /api/auth/login
   app.post<{ Body: LoginBody }>(
-    "/auth/login",
+    "/login",
     {
       config: { public: true },
       schema: { body: LoginBodySchema, response: { 200: AuthResponseSchema } },
@@ -67,8 +69,9 @@ const routes: FastifyPluginAsync = async (app) => {
     },
   );
 
+  // GET /api/auth/me
   app.get(
-    "/auth/me",
+    "/me",
     { preHandler: app.authenticate, schema: { response: { 200: MeResponseSchema } } },
     async (req, reply) => {
       try {
@@ -85,7 +88,8 @@ const routes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.post("/auth/logout", { config: { public: true } }, async (_req, reply) => {
+  // POST /api/auth/logout
+  app.post("/logout", { config: { public: true } }, async (_req, reply) => {
     reply.clearCookie("token", {
       path: "/",
       sameSite: cookieOpts.sameSite,
