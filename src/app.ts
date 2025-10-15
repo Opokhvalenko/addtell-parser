@@ -43,9 +43,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     trustProxy: true,
     logger: makeLogger(usePretty),
     disableRequestLogging: !isProd,
+    pluginTimeout: 30000,
   });
 
   await app.register(configPlugin);
+
+  await app.register((await import("./plugins/swagger.plugin.js")).default);
 
   await app.register((await import("./plugins/otel.plugin.js")).default);
   await app.register((await import("./plugins/health.plugin.js")).default);
@@ -55,18 +58,16 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 
   await app.register((await import("./plugins/jwt.plugin.js")).default);
   await app.register((await import("./plugins/auth.plugin.js")).default);
-
   await app.register((await import("./plugins/analytics.plugin.js")).default);
 
   await app.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     ignorePattern:
-      /^(otel|health|security-headers|rate-limit|audit-logging|jwt|auth|analytics|cookie|stats-alias)\.plugin\.(js|mjs|cjs)$/i,
+      /^(otel|health|security-headers|rate-limit|audit-logging|jwt|auth|analytics|cookie|stats-alias|swagger)\.plugin\.(js|mjs|cjs)$/i,
     encapsulate: true,
   });
 
   await app.register((await import("./plugins/stats-alias.plugin.js")).default);
-
   await app.register((await import("./routes/beautiful-ad.js")).default, { prefix: "/api" });
 
   if (!isProd || process.env.PRINT_ROUTES === "1") {

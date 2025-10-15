@@ -18,11 +18,12 @@ export default fp(
 
       const isLineItemPage = request.url.startsWith("/create-lineitem");
       const isTwEmbedCss = request.url.startsWith("/assets/tw-embed.css");
+      const isDocs = request.url.startsWith("/docs");
 
       const baseImgSrc = "img-src 'self' data: https: http:";
       const imgSrc = isLineItemPage ? `${baseImgSrc} blob:` : baseImgSrc;
 
-      const csp = [
+      const defaultCsp = [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
@@ -36,7 +37,23 @@ export default fp(
         `frame-ancestors ${FRAME_ANCESTORS}`,
         "upgrade-insecure-requests",
       ].join("; ");
-      reply.header("Content-Security-Policy", csp);
+
+      const docsCsp = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data: https: http:",
+        "connect-src 'self'",
+        "frame-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        `frame-ancestors ${FRAME_ANCESTORS}`,
+        "upgrade-insecure-requests",
+      ].join("; ");
+
+      reply.header("Content-Security-Policy", isDocs ? docsCsp : defaultCsp);
 
       if (FRAME_ANCESTORS === "'none'") {
         reply.header("X-Frame-Options", "DENY");
@@ -46,11 +63,11 @@ export default fp(
         reply.removeHeader("X-Frame-Options");
       }
 
-      if (isTwEmbedCss) {
+      if (isTwEmbedCss || isDocs) {
         reply.header("Cross-Origin-Resource-Policy", "cross-origin");
       }
 
-      if (isLineItemPage || isTwEmbedCss) {
+      if (isLineItemPage || isTwEmbedCss || isDocs) {
         reply.removeHeader("Cross-Origin-Embedder-Policy");
         reply.header("Cross-Origin-Opener-Policy", "same-origin");
       } else {
@@ -83,7 +100,7 @@ export default fp(
         reply.header("Expires", "0");
       }
 
-      if (!isTwEmbedCss) {
+      if (!isTwEmbedCss && !isDocs) {
         reply.header("Cross-Origin-Resource-Policy", "same-origin");
       }
     });
