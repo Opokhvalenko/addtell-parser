@@ -43,7 +43,7 @@ export default fp(
         },
         security: [{ bearerAuth: [] }],
       },
-      hideUntagged: true,
+      hideUntagged: false,
     });
 
     app.after(() => {
