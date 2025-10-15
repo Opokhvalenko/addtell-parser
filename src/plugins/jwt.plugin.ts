@@ -55,6 +55,9 @@ export default fp(
       "/feed",
       "/api/feed",
       "/api/article",
+      "/api/bid",
+      "/api/analytics/events",
+      "/api/analytics/stats",
 
       "/auth/login",
       "/auth/register",

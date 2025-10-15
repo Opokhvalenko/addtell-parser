@@ -6,7 +6,7 @@ export const EnvSchema = {
   properties: {
     PORT: { type: "integer", minimum: 1, maximum: 65535, default: 3000 },
     HOST: { type: "string", default: "0.0.0.0" },
-
+    FRAME_ANCESTORS: { type: "string" },
     PUBLIC_URL: { $ref: "#/$defs/url", default: "http://localhost:3000" },
     SWAGGER_ENABLE: { type: "string" },
     SWAGGER_UI: { type: "string" },
