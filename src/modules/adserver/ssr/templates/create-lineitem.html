@@ -25,11 +25,12 @@
       const shadow = host.attachShadow({ mode: 'open' });
 
       // Tailwind, зібраний локально (CSP-safe)
-    const tw = document.createElement('link');
-tw.rel = 'stylesheet';
-tw.href = '/assets/tw-embed.css?v=1';   // cache bust
-shadow.appendChild(tw);
+      const tw = document.createElement('link');
+      tw.rel = 'stylesheet';
+      tw.href = '/assets/tw-embed.css?v=1'; // cache-bust
+      shadow.appendChild(tw);
 
+      // Theme variables + dark через data-theme на :host
       const customStyles = document.createElement('style');
       customStyles.textContent = `
         :host {
@@ -38,15 +39,7 @@ shadow.appendChild(tw);
           --border-color:#d1d5db; --input-bg:#fff; --input-border:#d1d5db;
           --button-bg:#3b82f6; --button-hover:#2563eb;
         }
-        @media (prefers-color-scheme: dark) {
-          :host {
-            --bg-primary:#1f2937; --bg-secondary:#111827;
-            --text-primary:#f9fafb; --text-secondary:#9ca3af;
-            --border-color:#374151; --input-bg:#374151; --input-border:#4b5563;
-            --button-bg:#3b82f6; --button-hover:#2563eb;
-          }
-        }
-        :host-context(html.dark), :host-context(body.dark) {
+        :host([data-theme="dark"]) {
           --bg-primary:#1f2937; --bg-secondary:#111827;
           --text-primary:#f9fafb; --text-secondary:#9ca3af;
           --border-color:#374151; --input-bg:#374151; --input-border:#4b5563;
@@ -61,15 +54,12 @@ shadow.appendChild(tw);
           border-color:var(--input-border)!important;
           color:var(--text-primary)!important;
         }
-        input[type="file"]{ background-color:var(--input-bg)!important; border-color:var(--input-border)!important; color:var(--text-primary)!important; }
         input[type="file"]::-webkit-file-upload-button{
           background-color:var(--button-bg)!important; color:#fff!important; border:none!important;
           border-radius:.375rem!important; padding:.5rem .75rem!important; margin-right:.75rem!important; cursor:pointer!important;
         }
-        input[type="file"]::-webkit-file-upload-button:hover{ background-color:var(--button-hover)!important; }
-        input[type="file"]::-ms-browse{ background-color:var(--button-bg)!important; color:#fff!important; border:none!important; border-radius:.375rem!important; padding:.5rem .75rem!important; margin-right:.75rem!important; cursor:pointer!important; }
-        input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
-        input[type=number]{ -moz-appearance:textfield; }
+        .err { color:#dc2626; font-size:.8125rem; margin-top:.25rem; }
+        .hint { color:#6b7280; font-size:.75rem; margin-top:.25rem; }
       `;
       shadow.appendChild(customStyles);
 
@@ -78,25 +68,30 @@ shadow.appendChild(tw);
       wrap.className = 'bg-white rounded-2xl shadow-2xl border border-gray-300 p-6';
       wrap.innerHTML = `
         <form id="li-form" class="space-y-6" method="post" action="/ads/lineitems" enctype="multipart/form-data" novalidate>
+          <input type="hidden" name="csrfToken" value="%%CSRF_TOKEN%%" />
           <div>
             <label class="block text-sm font-medium mb-2 text-gray-900">Назва</label>
             <input name="name" required class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Введіть назву реклами" />
+            <div class="err" data-err="name"></div>
           </div>
 
           <div>
             <label class="block text-sm font-medium mb-2 text-gray-900">Розміри (напр. <code class="bg-gray-200 px-2 py-1 rounded text-blue-600">300x250,300x600</code>)</label>
             <input name="sizes" required pattern="^\\s*\\d+x\\d+(\\s*,\\s*\\d+x\\d+)*\\s*$" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="300x250,728x90" />
-            <p class="text-xs text-gray-600 mt-2">Підтримується список через кому.</p>
+            <p class="hint">Підтримується список через кому.</p>
+            <div class="err" data-err="sizes"></div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium mb-2 text-gray-900">Мінімальний CPM</label>
               <input name="minCpm" type="number" step="0.01" min="0" value="0" required class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <div class="err" data-err="minCpm"></div>
             </div>
             <div>
               <label class="block text-sm font-medium mb-2 text-gray-900">Максимальний CPM</label>
               <input name="maxCpm" type="number" step="0.01" min="0" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <div class="err" data-err="maxCpm"></div>
             </div>
           </div>
 
@@ -115,20 +110,44 @@ shadow.appendChild(tw);
             </div>
           </div>
 
-          <div>
-            <label class="block text-sm font-medium mb-2 text-gray-900">Частота показів на користувача (на день)</label>
-            <input name="frequencyPerDay" type="number" min="0" value="0" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-900">Старт</label>
+              <input name="startDate" type="date" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-900">Кінець</label>
+              <input name="endDate" type="date" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-900">Частота показів/день</label>
+              <input name="frequencyPerDay" type="number" min="0" value="0" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div class="flex items-center gap-3">
+              <input id="active" name="active" type="checkbox" class="h-4 w-4 rounded border-gray-300" checked />
+              <label for="active" class="text-sm text-gray-900">Активний</label>
+            </div>
           </div>
 
           <div>
             <label class="block text-sm font-medium mb-2 text-gray-900">Посилання переходу (optional)</label>
             <input name="clickUrl" type="url" placeholder="https://example.com" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            <div class="err" data-err="clickUrl"></div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2 text-gray-900">Inline HTML creative (optional)</label>
-            <textarea name="html" rows="4" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder='&lt;a href="https://…"&gt;&lt;img …&gt;&lt;/a&gt;'></textarea>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-sm font-medium text-gray-900">Inline HTML creative (optional)</label>
+              <button type="button" id="previewHtmlBtn" class="text-sm px-3 py-1 rounded bg-gray-800 text-white hover:bg-gray-700">Прев’ю</button>
+            </div>
+            <textarea name="html" rows="4" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder='&lt;a href="https://…"&gt;&lt;img …&gt;&lt;/a&gt;'></textarea>
+            <div class="err" data-err="html"></div>
+            <div id="htmlPreview" class="mt-3 hidden border border-gray-300 rounded-lg overflow-hidden">
+              <iframe title="creative-preview" sandbox="" style="width:100%;height:160px;border:0;"></iframe>
+            </div>
           </div>
 
           <div>
@@ -136,7 +155,9 @@ shadow.appendChild(tw);
             <input id="file" name="creative" type="file" accept="image/*" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 file:bg-gray-600 file:border-0 file:rounded file:px-3 file:py-1 file:text-white file:hover:bg-gray-500 file:transition-colors" />
             <div id="preview" class="mt-3 hidden">
               <img alt="preview" class="max-h-40 rounded-lg border border-gray-300" />
+              <p class="hint mt-2" id="imgInfo"></p>
             </div>
+            <div class="err" data-err="creative"></div>
             <p class="text-xs text-gray-600 mt-2">Якщо заповнено HTML — файл не обов'язковий.</p>
           </div>
 
@@ -144,8 +165,7 @@ shadow.appendChild(tw);
 
           <button id="submitBtn" class="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg">
             <span class="flex items-center justify-center">
-              <span class="mr-2">✨</span>
-              Створити рекламу
+              <span class="mr-2">✨</span> Створити рекламу
             </span>
           </button>
         </form>
@@ -159,73 +179,157 @@ shadow.appendChild(tw);
       const fileInput = $('#file');
       const previewBox = $('#preview');
       const previewImg = $('#preview img');
+      const imgInfo = $('#imgInfo');
+      const htmlTextarea = form.querySelector('textarea[name="html"]');
+      const htmlPreviewWrap = $('#htmlPreview');
+      const htmlPreviewFrame = $('#htmlPreview iframe');
+      const previewHtmlBtn = $('#previewHtmlBtn');
+
+      // origin батьківської сторінки (для теми)
+      let parentOrigin = '*';
+      try {
+        parentOrigin = new URL(document.referrer).origin;
+      } catch {}
+
+      // Приймаємо тему з батька
+      window.addEventListener('message', (ev) => {
+        if (parentOrigin !== '*' && ev.origin !== parentOrigin) return;
+        const d = ev.data || {};
+        if (d.type === 'theme') {
+          if (d.dark) host.setAttribute('data-theme', 'dark');
+          else host.removeAttribute('data-theme');
+          resize();
+          // підтвердження
+          try { window.parent.postMessage({ type: 'ack' }, parentOrigin); } catch {}
+        }
+      });
+
+      // Динамічний ресайз
       let raf = 0;
       const resize = () => {
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(() => {
-          const h = Math.ceil(wrap.getBoundingClientRect().height) + 16; 
+          const h = Math.ceil(wrap.getBoundingClientRect().height) + 16;
           parent.postMessage({ type: 'resize', height: h }, '*');
         });
       };
       new ResizeObserver(resize).observe(wrap);
-      window.addEventListener('load', resize);
+      window.addEventListener('load', () => {
+        resize();
+        try { window.parent.postMessage({ type: 'ready' }, parentOrigin); } catch {}
+      });
       tw.addEventListener('load', resize);
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(resize).catch(() => {});
       }
 
+      // Хелпери
+      const SIZE_LIST_RE = /^\s*\d+x\d+(?:\s*,\s*\\d+x\\d+)*\s*$/i;
+      const BAD_HTML_RE = /<script\\b|on\\w+\\s*=|javascript:/i;
+      const err = (name, text='') => {
+        const n = wrap.querySelector('[data-err="'+name+'"]');
+        if (n) n.textContent = text || '';
+      };
+      const parseSizes = (str) => (String(str||'')
+        .split(',')
+        .map(s=>s.trim())
+        .filter(Boolean)
+        .map(s => { const [w,h]=s.toLowerCase().split('x').map(Number); return {w,h}; })
+        .filter(s=>Number.isFinite(s.w)&&Number.isFinite(s.h)));
+
+      // Прев’ю HTML (безпечний: без скриптів, чистимо атрибути on*)
+      const buildSafeHtml = (raw) => {
+        let s = String(raw||'');
+        s = s.replace(/<script[\s\S]*?<\/script>/gi,'');
+        s = s.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,'');
+        s = s.replace(/\sjavascript:/gi,'');
+        return `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0}</style>${s}`;
+      };
+      const showHtmlPreview = () => {
+        const val = htmlTextarea.value.trim();
+        if (!val) { htmlPreviewWrap.classList.add('hidden'); return; }
+        if (BAD_HTML_RE.test(val)) { err('html','HTML містить заборонений вміст.'); htmlPreviewWrap.classList.add('hidden'); return; }
+        err('html','');
+        htmlPreviewWrap.classList.remove('hidden');
+        htmlPreviewFrame.setAttribute('sandbox',''); // без скриптів
+        htmlPreviewFrame.srcdoc = buildSafeHtml(val);
+        resize();
+      };
+      previewHtmlBtn.addEventListener('click', showHtmlPreview);
+      htmlTextarea.addEventListener('input', () => { err('html',''); /* live очистка помилок */ });
+
+      // Валідація файлу + перевірка розмірів
       fileInput.addEventListener('change', () => {
         const f = fileInput.files && fileInput.files[0];
+        const sizesVal = form.elements.namedItem('sizes')?.value || '';
+        const allow = parseSizes(sizesVal);
+        err('creative','');
+
         if (!f) { previewBox.classList.add('hidden'); return; }
-        if (!f.type.startsWith('image/')) { fileInput.value=''; msg.textContent='Файл має бути зображенням.'; return; }
-        if (f.size > 10 * 1024 * 1024) { fileInput.value=''; msg.textContent='Файл завеликий (макс 10MB).'; return; }
-        if (previewImg.src && previewImg.src.startsWith('blob:')) {
-          try { URL.revokeObjectURL(previewImg.src); } catch {}
-        }
-        previewImg.src = URL.createObjectURL(f);
+        if (!f.type.startsWith('image/')) { fileInput.value=''; err('creative','Файл має бути зображенням.'); return; }
+        if (f.size > 10 * 1024 * 1024) { fileInput.value=''; err('creative','Файл завеликий (макс 10MB).'); return; }
+
+        const url = URL.createObjectURL(f);
+        previewImg.onload = () => {
+          const w = previewImg.naturalWidth, h = previewImg.naturalHeight;
+          imgInfo.textContent = `Зображення: ${w}×${h}px`;
+          if (allow.length) {
+            const ok = allow.some(s => s.w === w && s.h === h);
+            if (!ok) err('creative', `Попередження: розмір ${w}×${h} не збігається з переліком sizes.`);
+          }
+          resize();
+        };
+        previewImg.onerror = () => { err('creative','Не вдалося відобразити прев’ю.'); };
+        previewImg.src = url;
         previewBox.classList.remove('hidden');
         resize();
       });
 
-      const SIZE_LIST_RE = /^\s*\d+x\d+(?:\s*,\s*\d+x\d+)*\s*$/i;
-      const BAD_HTML_RE = /<script\b|on\w+\s*=|javascript:/i;
-
+      // Онлайнова валідація
       form.addEventListener('input', (e) => {
         const t = e.target;
-        if (!t) return;
-        if (t.name === 'sizes') t.setCustomValidity(SIZE_LIST_RE.test(t.value) ? '' : 'Приклад: 300x250,300x600');
-        if (t.name === 'geo') t.value = t.value.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).join(',');
+        if (!t || !t.name) return;
+        if (t.name === 'name') err('name','');
+        if (t.name === 'sizes') {
+          err('sizes', SIZE_LIST_RE.test(t.value) ? '' : 'Приклад: 300x250,300x600');
+        }
+        if (t.name === 'geo') t.value = String(t.value).split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).join(',');
         if (t.name === 'maxCpm' || t.name === 'minCpm') {
           const min = parseFloat(form.minCpm.value || '0');
           const max = parseFloat(form.maxCpm.value || '');
-          form.maxCpm.setCustomValidity(!Number.isNaN(min) && !Number.isNaN(max) && max > 0 && max < min ? 'Max CPM має бути ≥ Min CPM' : '');
+          const bad = !Number.isNaN(min) && !Number.isNaN(max) && max > 0 && max < min;
+          err('maxCpm', bad ? 'Max CPM має бути ≥ Min CPM' : '');
         }
+        if (t.name === 'clickUrl') err('clickUrl','');
         resize();
       });
 
+      // Сабміт
       form.addEventListener('submit', async (ev) => {
         ev.preventDefault();
+        ['name','sizes','maxCpm','clickUrl','creative','html'].forEach(n=>err(n,''));
         msg.textContent = '';
         submitBtn.disabled = true;
         try {
           const fd = new FormData(form);
           const nameVal = (form.elements.namedItem('name')?.value || '').trim();
           const sizesVal = (form.elements.namedItem('sizes')?.value || '').trim();
-          if (!nameVal || !sizesVal) { msg.textContent='name і sizes обовʼязкові'; submitBtn.disabled=false; return; }
-          if (!SIZE_LIST_RE.test(sizesVal)) { msg.textContent='sizes: приклад 300x250,300x600'; submitBtn.disabled=false; return; }
+          if (!nameVal) { err('name','Обовʼязково.'); submitBtn.disabled=false; return; }
+          if (!sizesVal || !SIZE_LIST_RE.test(sizesVal)) { err('sizes','sizes: приклад 300x250,300x600'); submitBtn.disabled=false; return; }
           fd.set('name', nameVal); fd.set('sizes', sizesVal);
 
           const htmlVal = (form.elements.namedItem('html')?.value || '').trim();
           const clickVal = (form.elements.namedItem('clickUrl')?.value || '').trim();
           const hasFile = fileInput && fileInput.files && fileInput.files[0];
 
-          if (!htmlVal && !hasFile) { msg.textContent='Додайте HTML або файл зображення.'; submitBtn.disabled=false; return; }
+          if (!htmlVal && !hasFile) { err('creative','Додайте HTML або файл зображення.'); submitBtn.disabled=false; return; }
           if (htmlVal) {
-            if (BAD_HTML_RE.test(htmlVal)) { msg.textContent='HTML містить заборонений вміст.'; submitBtn.disabled=false; return; }
+            if (BAD_HTML_RE.test(htmlVal)) { err('html','HTML містить заборонений вміст.'); submitBtn.disabled=false; return; }
             fd.set('html', htmlVal);
           }
-          if (clickVal && !/^https?:\/\//i.test(clickVal)) { msg.textContent='Посилання має починатися з http/https'; submitBtn.disabled=false; return; }
+          if (clickVal && !/^https?:\/\//i.test(clickVal)) { err('clickUrl','Посилання має починатися з http/https'); submitBtn.disabled=false; return; }
 
+          // Нормалізація GEO
           const geoEl = form.elements.namedItem('geo');
           if (geoEl && geoEl.value != null) {
             const g = String(geoEl.value).split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).join(',');
@@ -241,12 +345,11 @@ shadow.appendChild(tw);
             msg.textContent = (data && (data.message || data.error)) || raw || 'Помилка створення line item';
           } else {
             const id = data?.id ?? (() => { try { return JSON.parse(raw).id; } catch { return null; } })();
-            msg.innerHTML = id
-              ? `Створено! ID: <code>${id}</code>`
-              : 'Ваш line item створено. Дякуємо!';
+            msg.innerHTML = id ? `Створено! ID: <code>${id}</code>` : 'Ваш line item створено. Дякуємо!';
             form.reset();
             if (previewImg.src && previewImg.src.startsWith('blob:')) { try { URL.revokeObjectURL(previewImg.src); } catch {} }
             previewImg.src = ''; previewBox.classList.add('hidden');
+            htmlPreviewWrap.classList.add('hidden');
             resize();
           }
         } finally {

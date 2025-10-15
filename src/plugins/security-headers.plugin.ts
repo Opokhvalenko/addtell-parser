@@ -17,7 +17,7 @@ export default fp(
             : devDefaults;
 
       const isLineItemPage = request.url.startsWith("/create-lineitem");
-      const isTwEmbedCss = request.url.startsWith("/assets/tw-embed.css");
+      const isTwEmbedCss = request.url.startsWith("/public/assets/tw-embed.css");
       const isDocs = request.url.startsWith("/docs");
 
       const baseImgSrc = "img-src 'self' data: https: http:";
