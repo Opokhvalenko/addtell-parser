@@ -1,5 +1,5 @@
 import swagger from "@fastify/swagger";
-import swaggerUI from "@fastify/swagger-ui";
+import swaggerUI, { type FastifySwaggerUiOptions } from "@fastify/swagger-ui";
 import fp from "fastify-plugin";
 
 export default fp(
@@ -7,10 +7,10 @@ export default fp(
     const isProd = String(app.config.NODE_ENV).toLowerCase() === "production";
     const enable =
       String(app.config.SWAGGER_ENABLE ?? (isProd ? "false" : "true")).toLowerCase() !== "false";
-    if (!enable) {
-      app.log.warn("[swagger] disabled (SWAGGER_ENABLE=false)");
-      return;
-    }
+    const showUI =
+      String(app.config.SWAGGER_UI ?? (isProd ? "false" : "true")).toLowerCase() !== "false";
+
+    if (!enable) return;
 
     await app.register(swagger, {
       openapi: {
@@ -28,15 +28,16 @@ export default fp(
       },
     });
 
-    // UI: у prod за замовчуванням вимкнено (аби не блокувати старт)
-    if (!isProd) {
-      await app.register(swaggerUI, {
+    if (showUI) {
+      const uiOpts: FastifySwaggerUiOptions = {
         routePrefix: "/docs",
         uiConfig: { docExpansion: "list", deepLinking: true },
-      });
+        ...(isProd ? { staticCSP: true, transformStaticCSP: (h: string) => h } : {}),
+      };
+
+      await app.register(swaggerUI, uiOpts);
     }
 
-    // Будуємо spec після повного завантаження всіх плагінів — без дедлоку
     app.addHook("onReady", () => {
       try {
         app.swagger();
@@ -44,8 +45,6 @@ export default fp(
         app.log.warn({ err }, "[swagger] build failed");
       }
     });
-
-    app.log.info("Swagger plugin registered");
   },
   { name: "swagger" },
 );

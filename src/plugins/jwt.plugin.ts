@@ -19,17 +19,9 @@ export default fp(
 
     if (!app.hasDecorator("setCookie")) {
       await app.register(cookie, { secret: cookieSecret, hook: "onRequest" });
-    } else {
-      app.log.warn("cookie already registered – skipping");
     }
-
     if (!app.hasDecorator("jwt")) {
-      await app.register(fastifyJwt, {
-        secret: jwtSecret,
-        cookie: { cookieName, signed: true },
-      });
-    } else {
-      app.log.warn("jwt already registered – skipping");
+      await app.register(fastifyJwt, { secret: jwtSecret, cookie: { cookieName, signed: true } });
     }
 
     if (!app.hasDecorator("authenticate")) {
@@ -47,27 +39,37 @@ export default fp(
     }
 
     const PUBLIC_PREFIXES = [
+      "/",
       "/health",
       "/docs",
+      "/docs/json",
+      "/docs/yaml",
       "/public",
       "/uploads",
       "/assets/tw-embed.css",
 
-      // аналітика
       "/api/analytics",
       "/api/stats",
       "/api/adserver/stats",
 
-      // решта
+      "/feed",
       "/api/feed",
       "/api/article",
+
+      "/auth/login",
+      "/auth/register",
+      "/auth/logout",
+      "/api/auth/login",
+      "/api/auth/register",
+      "/api/auth/logout",
+
       "/create-lineitem",
     ];
 
-    app.addHook("onRequest", async (req, reply) => {
+    app.addHook("preHandler", async (req, reply) => {
       if (req.method === "OPTIONS") return;
 
-      const clean = (req.raw.url ?? req.url).split("?")[0] ?? "";
+      const clean = (req.raw.url ?? req.url).split("?")[0] || "";
       if (PUBLIC_PREFIXES.some((p) => clean.startsWith(p))) return;
 
       if (req.routeOptions?.config?.public === true) return;
