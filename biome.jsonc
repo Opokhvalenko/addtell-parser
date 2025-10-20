@@ -12,7 +12,15 @@
     }
   },
   "files": {
-    "includes": ["**", "!node_modules", "!dist", "!coverage", "!public/assets"],
+    "includes": [
+      "**",
+      "!node_modules",
+      "!dist",
+      "!coverage",
+      "!public/assets",
+      "!src/ssr/embed.css",
+      "!src/embed.css"
+    ],
     "ignoreUnknown": true
   }
 }

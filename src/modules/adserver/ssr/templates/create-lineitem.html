@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="uk">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -12,8 +12,8 @@
 <body>
   <div class="max-w-3xl mx-auto p-6">
     <div class="mb-6">
-      <h1 class="text-3xl font-bold mb-2 text-gray-900">Створення реклами (Line Item)</h1>
-      <p class="text-sm text-gray-600">Вітаємо, <strong class="text-blue-600">%%USER_EMAIL%%</strong></p>
+      <h1 class="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">Create Advertisement (Line Item)</h1>
+      <p class="text-sm text-gray-600 dark:text-gray-400">Welcome, <strong class="text-blue-600">%%USER_EMAIL%%</strong></p>
     </div>
 
     <div id="li-form-root"></div>
@@ -24,85 +24,77 @@
       const host = document.getElementById('li-form-root');
       const shadow = host.attachShadow({ mode: 'open' });
 
-      // Tailwind, зібраний локально (CSP-safe)
+      // Tailwind (compiled for the shadow form)
       const tw = document.createElement('link');
       tw.rel = 'stylesheet';
-      tw.href = '/assets/tw-embed.css?v=1'; // cache-bust
+      tw.href = '/public/assets/tw-embed.css?v=3'; // cache-bust & works via Vite proxy
       shadow.appendChild(tw);
 
-      // Theme variables + dark через data-theme на :host
-      const customStyles = document.createElement('style');
-      customStyles.textContent = `
-        :host {
-          --bg-primary:#fff; --bg-secondary:#f9fafb;
-          --text-primary:#111827; --text-secondary:#6b7280;
-          --border-color:#d1d5db; --input-bg:#fff; --input-border:#d1d5db;
-          --button-bg:#3b82f6; --button-hover:#2563eb;
-        }
-        :host([data-theme="dark"]) {
-          --bg-primary:#1f2937; --bg-secondary:#111827;
-          --text-primary:#f9fafb; --text-secondary:#9ca3af;
-          --border-color:#374151; --input-bg:#374151; --input-border:#4b5563;
-          --button-bg:#3b82f6; --button-hover:#2563eb;
-        }
-        .bg-white{ background-color:var(--bg-primary)!important; }
-        .text-gray-900{ color:var(--text-primary)!important; }
-        .text-gray-600{ color:var(--text-secondary)!important; }
-        .border-gray-300{ border-color:var(--border-color)!important; }
-        input,select,textarea{
-          background-color:var(--input-bg)!important;
-          border-color:var(--input-border)!important;
-          color:var(--text-primary)!important;
-        }
-        input[type="file"]::-webkit-file-upload-button{
-          background-color:var(--button-bg)!important; color:#fff!important; border:none!important;
-          border-radius:.375rem!important; padding:.5rem .75rem!important; margin-right:.75rem!important; cursor:pointer!important;
-        }
-        .err { color:#dc2626; font-size:.8125rem; margin-top:.25rem; }
-        .hint { color:#6b7280; font-size:.75rem; margin-top:.25rem; }
+      // Minimal extra styles for messages
+      const custom = document.createElement('style');
+      custom.textContent = `
+        .err  { color:#dc2626; font-size:.8125rem; margin-top:.25rem; }
+        .hint { color:#6b7280; font-size:.75rem;  margin-top:.25rem; }
       `;
-      shadow.appendChild(customStyles);
+      shadow.appendChild(custom);
 
-      // Карточка форми
+      // Card
       const wrap = document.createElement('div');
-      wrap.className = 'bg-white rounded-2xl shadow-2xl border border-gray-300 p-6';
+      wrap.className = 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-2xl shadow-2xl border border-gray-300 dark:border-slate-700 p-6';
       wrap.innerHTML = `
         <form id="li-form" class="space-y-6" method="post" action="/ads/lineitems" enctype="multipart/form-data" novalidate>
           <input type="hidden" name="csrfToken" value="%%CSRF_TOKEN%%" />
+
           <div>
-            <label class="block text-sm font-medium mb-2 text-gray-900">Назва</label>
-            <input name="name" required class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Введіть назву реклами" />
+            <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">Name</label>
+            <input name="name" required
+              class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                     text-gray-900 dark:text-slate-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter ad name" />
             <div class="err" data-err="name"></div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2 text-gray-900">Розміри (напр. <code class="bg-gray-200 px-2 py-1 rounded text-blue-600">300x250,300x600</code>)</label>
-            <input name="sizes" required pattern="^\\s*\\d+x\\d+(\\s*,\\s*\\d+x\\d+)*\\s*$" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="300x250,728x90" />
-            <p class="hint">Підтримується список через кому.</p>
+            <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">
+              Sizes (e.g., <code class="bg-gray-200 dark:bg-slate-700 px-2 py-1 rounded text-blue-600">300x250,300x600</code>)
+            </label>
+            <input name="sizes" required pattern="^\\s*\\d+x\\d+(\\s*,\\s*\\d+x\\d+)*\\s*$"
+              class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                     text-gray-900 dark:text-slate-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="300x250,728x90" />
+            <p class="hint">Comma-separated list supported.</p>
             <div class="err" data-err="sizes"></div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium mb-2 text-gray-900">Мінімальний CPM</label>
-              <input name="minCpm" type="number" step="0.01" min="0" value="0" required class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">Min CPM</label>
+              <input name="minCpm" type="number" step="0.01" min="0" value="0" required
+                class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                       text-gray-900 dark:text-slate-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               <div class="err" data-err="minCpm"></div>
             </div>
             <div>
-              <label class="block text-sm font-medium mb-2 text-gray-900">Максимальний CPM</label>
-              <input name="maxCpm" type="number" step="0.01" min="0" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">Max CPM</label>
+              <input name="maxCpm" type="number" step="0.01" min="0"
+                class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                       text-gray-900 dark:text-slate-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               <div class="err" data-err="maxCpm"></div>
             </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium mb-2 text-gray-900">GEO (через кому)</label>
-              <input name="geo" placeholder="US,UA,PL" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">GEO (comma-separated)</label>
+              <input name="geo" placeholder="US,UA,PL"
+                class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                       text-gray-900 dark:text-slate-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
             <div>
-              <label class="block text-sm font-medium mb-2 text-gray-900">Тип реклами</label>
-              <select name="adType" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">Ad type</label>
+              <select name="adType"
+                class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                       text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="banner">banner</option>
                 <option value="native">native</option>
                 <option value="video">video</option>
@@ -112,60 +104,75 @@
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium mb-2 text-gray-900">Старт</label>
-              <input name="startDate" type="date" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">Start</label>
+              <input name="startDate" type="date"
+                class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                       text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
             <div>
-              <label class="block text-sm font-medium mb-2 text-gray-900">Кінець</label>
-              <input name="endDate" type="date" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">End</label>
+              <input name="endDate" type="date"
+                class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                       text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium mb-2 text-gray-900">Частота показів/день</label>
-              <input name="frequencyPerDay" type="number" min="0" value="0" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">Frequency per day</label>
+              <input name="frequencyPerDay" type="number" min="0" value="0"
+                class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                       text-gray-900 dark:text-slate-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
-            <div class="flex items-center gap-3">
-              <input id="active" name="active" type="checkbox" class="h-4 w-4 rounded border-gray-300" checked />
-              <label for="active" class="text-sm text-gray-900">Активний</label>
+            <div class="flex items-center gap-3 pt-7">
+              <input id="active" name="active" type="checkbox" class="h-4 w-4 rounded border-gray-300 dark:border-slate-600" checked />
+              <label for="active" class="text-sm text-gray-900 dark:text-gray-100">Active</label>
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2 text-gray-900">Посилання переходу (optional)</label>
-            <input name="clickUrl" type="url" placeholder="https://example.com" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">Click-through URL (optional)</label>
+            <input name="clickUrl" type="url" placeholder="https://example.com"
+              class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                     text-gray-900 dark:text-slate-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             <div class="err" data-err="clickUrl"></div>
           </div>
 
           <div>
             <div class="flex items-center justify-between mb-2">
-              <label class="block text-sm font-medium text-gray-900">Inline HTML creative (optional)</label>
-              <button type="button" id="previewHtmlBtn" class="text-sm px-3 py-1 rounded bg-gray-800 text-white hover:bg-gray-700">Прев’ю</button>
+              <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Inline HTML creative (optional)</label>
+              <button type="button" id="previewHtmlBtn" class="text-sm px-3 py-1 rounded bg-gray-800 text-white hover:bg-gray-700">Preview</button>
             </div>
-            <textarea name="html" rows="4" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder='&lt;a href="https://…"&gt;&lt;img …&gt;&lt;/a&gt;'></textarea>
+            <textarea name="html" rows="4"
+              class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                     text-gray-900 dark:text-slate-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder='&lt;a href="https://…"&gt;&lt;img …&gt;&lt;/a&gt;'></textarea>
             <div class="err" data-err="html"></div>
-            <div id="htmlPreview" class="mt-3 hidden border border-gray-300 rounded-lg overflow-hidden">
+            <div id="htmlPreview" class="mt-3 hidden border border-gray-300 dark:border-slate-600 rounded-lg overflow-hidden">
               <iframe title="creative-preview" sandbox="" style="width:100%;height:160px;border:0;"></iframe>
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2 text-gray-900">Файл креатива (PNG/JPG/GIF, optional)</label>
-            <input id="file" name="creative" type="file" accept="image/*" class="mt-1 w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 file:bg-gray-600 file:border-0 file:rounded file:px-3 file:py-1 file:text-white file:hover:bg-gray-500 file:transition-colors" />
+            <label class="block text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">Creative file (PNG/JPG/GIF, optional)</label>
+            <input id="file" name="creative" type="file" accept="image/*"
+              class="mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3
+                     text-gray-900 dark:text-slate-100 file:bg-gray-600 file:border-0 file:rounded file:px-3 file:py-1 file:text-white file:hover:bg-gray-500 file:transition-colors" />
             <div id="preview" class="mt-3 hidden">
-              <img alt="preview" class="max-h-40 rounded-lg border border-gray-300" />
+              <img alt="preview" class="max-h-40 rounded-lg border border-gray-300 dark:border-slate-600" />
               <p class="hint mt-2" id="imgInfo"></p>
             </div>
             <div class="err" data-err="creative"></div>
-            <p class="text-xs text-gray-600 mt-2">Якщо заповнено HTML — файл не обов'язковий.</p>
+            <p class="text-xs text-gray-600 dark:text-gray-400 mt-2">If HTML is provided, the file is optional.</p>
           </div>
 
           <div id="msg" class="text-sm" aria-live="polite"></div>
 
-          <button id="submitBtn" class="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg">
+          <button id="submitBtn"
+            class="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium
+                   hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg">
             <span class="flex items-center justify-center">
-              <span class="mr-2">✨</span> Створити рекламу
+              <span class="mr-2">✨</span> Create line item
             </span>
           </button>
         </form>
@@ -185,13 +192,11 @@
       const htmlPreviewFrame = $('#htmlPreview iframe');
       const previewHtmlBtn = $('#previewHtmlBtn');
 
-      // origin батьківської сторінки (для теми)
+      // Parent origin (theme sync)
       let parentOrigin = '*';
-      try {
-        parentOrigin = new URL(document.referrer).origin;
-      } catch {}
+      try { parentOrigin = new URL(document.referrer).origin; } catch {}
 
-      // Приймаємо тему з батька
+      // Receive theme from host
       window.addEventListener('message', (ev) => {
         if (parentOrigin !== '*' && ev.origin !== parentOrigin) return;
         const d = ev.data || {};
@@ -199,12 +204,11 @@
           if (d.dark) host.setAttribute('data-theme', 'dark');
           else host.removeAttribute('data-theme');
           resize();
-          // підтвердження
           try { window.parent.postMessage({ type: 'ack' }, parentOrigin); } catch {}
         }
       });
 
-      // Динамічний ресайз
+      // Dynamic resize
       let raf = 0;
       const resize = () => {
         cancelAnimationFrame(raf);
@@ -223,21 +227,19 @@
         document.fonts.ready.then(resize).catch(() => {});
       }
 
-      // Хелпери
-      const SIZE_LIST_RE = /^\s*\d+x\d+(?:\s*,\s*\\d+x\\d+)*\s*$/i;
-      const BAD_HTML_RE = /<script\\b|on\\w+\\s*=|javascript:/i;
+      // Helpers
+      const SIZE_LIST_RE = /^\s*\d+x\d+(?:\s*,\s*\d+x\d+)*\s*$/i;
+      const BAD_HTML_RE  = /<script\b|on\w+\s*=|javascript:/i;
       const err = (name, text='') => {
         const n = wrap.querySelector('[data-err="'+name+'"]');
         if (n) n.textContent = text || '';
       };
       const parseSizes = (str) => (String(str||'')
-        .split(',')
-        .map(s=>s.trim())
-        .filter(Boolean)
+        .split(',').map(s=>s.trim()).filter(Boolean)
         .map(s => { const [w,h]=s.toLowerCase().split('x').map(Number); return {w,h}; })
         .filter(s=>Number.isFinite(s.w)&&Number.isFinite(s.h)));
 
-      // Прев’ю HTML (безпечний: без скриптів, чистимо атрибути on*)
+      // Safe HTML preview
       const buildSafeHtml = (raw) => {
         let s = String(raw||'');
         s = s.replace(/<script[\s\S]*?<\/script>/gi,'');
@@ -248,17 +250,17 @@
       const showHtmlPreview = () => {
         const val = htmlTextarea.value.trim();
         if (!val) { htmlPreviewWrap.classList.add('hidden'); return; }
-        if (BAD_HTML_RE.test(val)) { err('html','HTML містить заборонений вміст.'); htmlPreviewWrap.classList.add('hidden'); return; }
+        if (BAD_HTML_RE.test(val)) { err('html','HTML contains disallowed content.'); htmlPreviewWrap.classList.add('hidden'); return; }
         err('html','');
         htmlPreviewWrap.classList.remove('hidden');
-        htmlPreviewFrame.setAttribute('sandbox',''); // без скриптів
+        htmlPreviewFrame.setAttribute('sandbox','');
         htmlPreviewFrame.srcdoc = buildSafeHtml(val);
         resize();
       };
       previewHtmlBtn.addEventListener('click', showHtmlPreview);
-      htmlTextarea.addEventListener('input', () => { err('html',''); /* live очистка помилок */ });
+      htmlTextarea.addEventListener('input', () => { err('html',''); });
 
-      // Валідація файлу + перевірка розмірів
+      // File validation + size check
       fileInput.addEventListener('change', () => {
         const f = fileInput.files && fileInput.files[0];
         const sizesVal = form.elements.namedItem('sizes')?.value || '';
@@ -266,45 +268,42 @@
         err('creative','');
 
         if (!f) { previewBox.classList.add('hidden'); return; }
-        if (!f.type.startsWith('image/')) { fileInput.value=''; err('creative','Файл має бути зображенням.'); return; }
-        if (f.size > 10 * 1024 * 1024) { fileInput.value=''; err('creative','Файл завеликий (макс 10MB).'); return; }
+        if (!f.type.startsWith('image/')) { fileInput.value=''; err('creative','File must be an image.'); return; }
+        if (f.size > 10 * 1024 * 1024) { fileInput.value=''; err('creative','File is too large (max 10MB).'); return; }
 
         const url = URL.createObjectURL(f);
         previewImg.onload = () => {
           const w = previewImg.naturalWidth, h = previewImg.naturalHeight;
-          imgInfo.textContent = `Зображення: ${w}×${h}px`;
-          if (allow.length) {
-            const ok = allow.some(s => s.w === w && s.h === h);
-            if (!ok) err('creative', `Попередження: розмір ${w}×${h} не збігається з переліком sizes.`);
+          imgInfo.textContent = `Image: ${w}×${h}px`;
+          if (allow.length && !allow.some(s => s.w === w && s.h === h)) {
+            err('creative', `Warning: ${w}×${h}px doesn't match Sizes list.`);
           }
           resize();
         };
-        previewImg.onerror = () => { err('creative','Не вдалося відобразити прев’ю.'); };
+        previewImg.onerror = () => { err('creative','Preview failed.'); };
         previewImg.src = url;
         previewBox.classList.remove('hidden');
         resize();
       });
 
-      // Онлайнова валідація
+      // Live validation
       form.addEventListener('input', (e) => {
         const t = e.target;
         if (!t || !t.name) return;
         if (t.name === 'name') err('name','');
-        if (t.name === 'sizes') {
-          err('sizes', SIZE_LIST_RE.test(t.value) ? '' : 'Приклад: 300x250,300x600');
-        }
+        if (t.name === 'sizes') err('sizes', SIZE_LIST_RE.test(t.value) ? '' : 'Example: 300x250,300x600');
         if (t.name === 'geo') t.value = String(t.value).split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).join(',');
         if (t.name === 'maxCpm' || t.name === 'minCpm') {
           const min = parseFloat(form.minCpm.value || '0');
           const max = parseFloat(form.maxCpm.value || '');
           const bad = !Number.isNaN(min) && !Number.isNaN(max) && max > 0 && max < min;
-          err('maxCpm', bad ? 'Max CPM має бути ≥ Min CPM' : '');
+          err('maxCpm', bad ? 'Max CPM must be ≥ Min CPM' : '');
         }
         if (t.name === 'clickUrl') err('clickUrl','');
         resize();
       });
 
-      // Сабміт
+      // Submit
       form.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         ['name','sizes','maxCpm','clickUrl','creative','html'].forEach(n=>err(n,''));
@@ -312,24 +311,24 @@
         submitBtn.disabled = true;
         try {
           const fd = new FormData(form);
-          const nameVal = (form.elements.namedItem('name')?.value || '').trim();
+          const nameVal  = (form.elements.namedItem('name')?.value  || '').trim();
           const sizesVal = (form.elements.namedItem('sizes')?.value || '').trim();
-          if (!nameVal) { err('name','Обовʼязково.'); submitBtn.disabled=false; return; }
-          if (!sizesVal || !SIZE_LIST_RE.test(sizesVal)) { err('sizes','sizes: приклад 300x250,300x600'); submitBtn.disabled=false; return; }
+          if (!nameVal) { err('name','Required.'); submitBtn.disabled=false; return; }
+          if (!sizesVal || !SIZE_LIST_RE.test(sizesVal)) { err('sizes','Example: 300x250,300x600'); submitBtn.disabled=false; return; }
           fd.set('name', nameVal); fd.set('sizes', sizesVal);
 
-          const htmlVal = (form.elements.namedItem('html')?.value || '').trim();
+          const htmlVal  = (form.elements.namedItem('html')?.value || '').trim();
           const clickVal = (form.elements.namedItem('clickUrl')?.value || '').trim();
-          const hasFile = fileInput && fileInput.files && fileInput.files[0];
+          const hasFile  = fileInput && fileInput.files && fileInput.files[0];
 
-          if (!htmlVal && !hasFile) { err('creative','Додайте HTML або файл зображення.'); submitBtn.disabled=false; return; }
+          if (!htmlVal && !hasFile) { err('creative','Provide HTML or upload a file.'); submitBtn.disabled=false; return; }
           if (htmlVal) {
-            if (BAD_HTML_RE.test(htmlVal)) { err('html','HTML містить заборонений вміст.'); submitBtn.disabled=false; return; }
+            if (BAD_HTML_RE.test(htmlVal)) { err('html','HTML contains disallowed content.'); submitBtn.disabled=false; return; }
             fd.set('html', htmlVal);
           }
-          if (clickVal && !/^https?:\/\//i.test(clickVal)) { err('clickUrl','Посилання має починатися з http/https'); submitBtn.disabled=false; return; }
+          if (clickVal && !/^https?:\/\//i.test(clickVal)) { err('clickUrl','URL must start with http/https'); submitBtn.disabled=false; return; }
 
-          // Нормалізація GEO
+          // Normalize GEO
           const geoEl = form.elements.namedItem('geo');
           if (geoEl && geoEl.value != null) {
             const g = String(geoEl.value).split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).join(',');
@@ -337,15 +336,15 @@
           }
 
           const res = await fetch(form.action, { method:'POST', body:fd, credentials:'include' });
-          const ct = res.headers.get('content-type') || '';
+          const ct  = res.headers.get('content-type') || '';
           const raw = await res.text();
-          let data = null; if (ct.includes('application/json')) { try { data = JSON.parse(raw); } catch {} }
+          let data  = null; if (ct.includes('application/json')) { try { data = JSON.parse(raw); } catch {} }
 
           if (!res.ok) {
-            msg.textContent = (data && (data.message || data.error)) || raw || 'Помилка створення line item';
+            msg.textContent = (data && (data.message || data.error)) || raw || 'Failed to create line item';
           } else {
             const id = data?.id ?? (() => { try { return JSON.parse(raw).id; } catch { return null; } })();
-            msg.innerHTML = id ? `Створено! ID: <code>${id}</code>` : 'Ваш line item створено. Дякуємо!';
+            msg.innerHTML = id ? `Created! ID: <code>${id}</code>` : 'Line item created. Thank you!';
             form.reset();
             if (previewImg.src && previewImg.src.startsWith('blob:')) { try { URL.revokeObjectURL(previewImg.src); } catch {} }
             previewImg.src = ''; previewBox.classList.add('hidden');

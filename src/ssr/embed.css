@@ -1,10 +1,17 @@
+/* biome-ignore-file lint/suspicious/noUnknownAtRules: Tailwind v4 directives */
+
 @import "tailwindcss";
-
-/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind v4 plugin directive */
 @plugin "@tailwindcss/forms";
-/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind v4 plugin directive */
 @plugin "@tailwindcss/typography";
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@source "../**/create-lineitem.{html,htm}"
+        "../**/*create-lineitem*.{html,js}"
+        "./**/*.{ts,tsx,js,jsx,html}";
 
-:root {
-  color-scheme: light dark;
+@layer base {
+  :host {
+    color-scheme: light dark;
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
 }
