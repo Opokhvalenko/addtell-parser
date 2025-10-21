@@ -49,7 +49,7 @@ async function probePrisma(app: FastifyInstance) {
     return withTimeout(candidate.$runCommandRaw({ ping: 1 }));
   }
   if (typeof candidate.$queryRaw === "function") {
-    // @ts-expect-error — типовий тег для SQL шаблону доступний у SQL-діалектах
+    // @ts-expect-error
     return withTimeout(prisma.$queryRaw`SELECT 1`);
   }
   return { ok: false, error: "unknown client" };
