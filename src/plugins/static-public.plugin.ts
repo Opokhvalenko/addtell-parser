@@ -1,6 +1,7 @@
 import path from "node:path";
 import fastifyStatic from "@fastify/static";
 import fp from "fastify-plugin";
+
 export default fp(
   async (app) => {
     const root = path.join(process.cwd(), "public");
@@ -8,6 +9,7 @@ export default fp(
       root,
       prefix: "/public/",
       index: false,
+      decorateReply: true,
     });
     app.log.info({ root }, "static-public: enabled");
   },

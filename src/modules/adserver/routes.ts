@@ -174,7 +174,6 @@ const routes: FastifyPluginAsync = async (app) => {
         if (!safe.ok) throw app.httpErrors.badRequest(`html not allowed: ${safe.reason}`);
       }
 
-      // Create creative if HTML is provided
       let creativeId = b.creativeId;
       if (b.html && !creativeId) {
         const uploadsDir = await ensureUploadsDir(app);
@@ -197,7 +196,6 @@ const routes: FastifyPluginAsync = async (app) => {
         creativeId = creative.id;
       }
 
-      // Валідація без non-null assertion
       if (!creativeId) {
         throw app.httpErrors.badRequest("either creativeId or html must be provided");
       }
@@ -208,7 +206,7 @@ const routes: FastifyPluginAsync = async (app) => {
         sizes,
         adType: b.adType,
         geo,
-        creativeId, // без '!'
+        creativeId,
       };
       if (typeof b.minCpm === "number") payload.minCpm = b.minCpm;
       if (typeof b.maxCpm === "number") payload.maxCpm = b.maxCpm;
@@ -221,7 +219,6 @@ const routes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // Create creative endpoint
   app.post<{ Body: { name: string; html: string; width: number; height: number } }>(
     "/creatives",
     { preHandler: app.authenticate },

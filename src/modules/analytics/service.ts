@@ -2,7 +2,6 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { FastifyInstance } from "fastify";
 import type { BaseEvent, StatRow, StatsQuery } from "./types.js";
 
-/* ───────────────────────────── helpers ──────────────────────────────── */
 function toCHDateTime(input?: number | string | Date): string {
   const d =
     typeof input === "number"
@@ -29,7 +28,6 @@ function chId(name: string) {
   return `\`${name}\``;
 }
 
-/** перетворює значення на масив рядків (прибирає undefined) */
 function asStringArray(v: string | string[] | undefined, defCSV = ""): string[] {
   if (Array.isArray(v)) {
     return v.filter((s): s is string => typeof s === "string" && s.length > 0);
@@ -65,7 +63,6 @@ function buildOrderBy(orderBy: string | undefined, allowed: Set<string>, fallbac
   return cleaned || fallback;
 }
 
-/* ─────────────────────── мапінги вимірів і метрик ───────────────────── */
 const GROUPS = {
   day: "toDate(ts) AS day",
   hour: "toHour(ts) AS hour",
@@ -86,7 +83,6 @@ const METRICS = {
   revenue: "sumIf(cpm, event IN ('bidWon','win')) / 1000 AS revenue",
 } as const satisfies Record<string, string>;
 
-/* ── ключі та гард-функції для безпечної індексації */
 type GroupKey = keyof typeof GROUPS;
 type MetricKey = keyof typeof METRICS;
 
@@ -97,7 +93,6 @@ function isMetricKey(s: string): s is MetricKey {
   return s in METRICS;
 }
 
-/* ─────────────────────────── reporter (батч) ────────────────────────── */
 export function createReporter(app: FastifyInstance) {
   const DB = app.config.CLICKHOUSE_DB || "adtell";
   const TABLE = app.config.CLICKHOUSE_TABLE || "events";
@@ -131,7 +126,6 @@ export function createReporter(app: FastifyInstance) {
         return;
       }
       await ch.insert({
-        // у SDK немає поля `database`, даємо повне імʼя:
         table: `${DB}.${TABLE}`,
         values: payload.map((e) => ({
           ts: toCHDateTime(e.ts ?? new Date()),
@@ -177,22 +171,18 @@ export function createReporter(app: FastifyInstance) {
   return { enqueue, flushNow: flush };
 }
 
-/* ─────────────────────────── getStats (читання) ─────────────────────── */
 export async function getStats(app: FastifyInstance, q: StatsQuery) {
   const client = app.clickhouse as ClickHouseClient | undefined;
   if (!client) return [] as StatRow[];
 
-  // Дати: приймаємо і string ('YYYY-MM-DD'), і Date
   const fromStr = typeof q.from === "string" ? q.from : toYMD(q.from);
   const toStr = typeof q.to === "string" ? q.to : toYMD(q.to);
 
-  // Межі інтервалу: [from 00:00:00; to+1d 00:00:00)
   const fromDT = toCHDateTime(new Date(`${fromStr}T00:00:00Z`));
   const toExclusiveDT = toCHDateTime(
     new Date(new Date(`${toStr}T00:00:00Z`).getTime() + 86400_000),
   );
 
-  // ── Виміри (groupBy)
   const groupKeys = asStringArray(q.groupBy, "day,event,adapter").filter(isGroupKey);
   const groupExprs = groupKeys.map((g) => GROUPS[g]);
   const groupAliases = groupExprs.map(extractAlias);
@@ -202,7 +192,6 @@ export async function getStats(app: FastifyInstance, q: StatsQuery) {
     groupAliases.push("day");
   }
 
-  // ── Метрики
   const metricKeys = asStringArray(q.metrics, "count,wins,cpmAvg").filter(isMetricKey);
   let metricExprs = metricKeys.map((m) => METRICS[m]);
 
@@ -210,10 +199,8 @@ export async function getStats(app: FastifyInstance, q: StatsQuery) {
     metricExprs = [METRICS.count];
   }
 
-  // ORDER BY — тільки дозволені поля
   const allowedOrder = new Set<string>([...groupAliases, ...metricExprs.map(extractAlias)]);
 
-  // безпечний фолбек, аби TS не бачив undefined
   const defaultMetricAlias = extractAlias(metricExprs[0] ?? METRICS.count);
 
   const orderExpr = buildOrderBy(

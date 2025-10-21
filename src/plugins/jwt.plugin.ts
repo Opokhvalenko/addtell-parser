@@ -21,7 +21,10 @@ export default fp(
       await app.register(cookie, { secret: cookieSecret, hook: "onRequest" });
     }
     if (!app.hasDecorator("jwt")) {
-      await app.register(fastifyJwt, { secret: jwtSecret, cookie: { cookieName, signed: true } });
+      await app.register(fastifyJwt, {
+        secret: jwtSecret,
+        cookie: { cookieName, signed: true },
+      });
     }
 
     if (!app.hasDecorator("authenticate")) {
@@ -65,19 +68,28 @@ export default fp(
       "/api/auth/login",
       "/api/auth/register",
       "/api/auth/logout",
-
-      "/create-lineitem",
     ];
+
+    const PROTECTED_PREFIXES = ["/api/ads", "/api/ads-debug", "/api/create-lineitem"];
 
     app.addHook("preHandler", async (req, reply) => {
       if (req.method === "OPTIONS") return;
 
       const clean = (req.raw.url ?? req.url).split("?")[0] || "";
-      if (PUBLIC_PREFIXES.some((p) => clean.startsWith(p))) return;
 
+      if (PUBLIC_PREFIXES.some((p) => clean.startsWith(p))) return;
       if (req.routeOptions?.config?.public === true) return;
 
-      return app.authenticate(req, reply);
+      try {
+        await app.authenticate(req, reply);
+      } catch {
+        if (PROTECTED_PREFIXES.some((p) => clean.startsWith(p))) {
+          const next = clean.replace(/^\/api/, "");
+          return reply.code(302).redirect(`/auth/login?next=${encodeURIComponent(next)}`);
+        }
+
+        return reply.unauthorized();
+      }
     });
   },
   { name: "jwt" },
