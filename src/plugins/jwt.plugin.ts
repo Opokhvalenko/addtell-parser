@@ -70,7 +70,15 @@ export default fp(
       "/api/auth/logout",
     ];
 
-    const PROTECTED_PREFIXES = ["/api/ads", "/api/ads-debug", "/api/create-lineitem"];
+    const PROTECTED_PREFIXES = [
+      "/ads-debug",
+      "/create-lineitem",
+      "/demo",
+      "/api/ads-debug",
+      "/api/create-lineitem",
+      "/api/demo",
+      "/api/ads",
+    ];
 
     app.addHook("preHandler", async (req, reply) => {
       if (req.method === "OPTIONS") return;
