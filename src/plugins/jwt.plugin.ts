@@ -52,7 +52,7 @@ export default fp(
         }
       });
     }
-
+    const PUBLIC_EXACT = new Set<string>(["/", "/favicon.ico", "/robots.txt"]);
     const PUBLIC_PREFIXES = [
       "/health",
       "/docs",
@@ -98,8 +98,11 @@ export default fp(
 
       const clean = (req.raw.url ?? req.url).split("?")[0] || "";
 
-      if (PUBLIC_PREFIXES.some((p) => clean.startsWith(p))) return;
+      if (PUBLIC_EXACT.has(clean)) return;
+
       if (req.routeOptions?.config?.public === true) return;
+
+      if (PUBLIC_PREFIXES.some((p) => clean.startsWith(p))) return;
 
       try {
         await app.authenticate(req, reply);
@@ -108,7 +111,6 @@ export default fp(
           const next = clean.replace(/^\/api/, "");
           return reply.redirect(`${CLIENT_ORIGIN}/login?next=${encodeURIComponent(next)}`, 302);
         }
-
         return reply.unauthorized();
       }
     });
