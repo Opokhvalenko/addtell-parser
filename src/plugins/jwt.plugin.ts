@@ -2,6 +2,7 @@ import cookie from "@fastify/cookie";
 import fastifyJwt from "@fastify/jwt";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
+import "@fastify/jwt";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -9,11 +10,22 @@ declare module "fastify" {
   }
 }
 
+type CfgExtra = {
+  JWT_COOKIE?: string;
+  COOKIE_SECRET?: string;
+  JWT_SECRET?: string;
+  APP_ORIGIN?: string;
+  NODE_ENV?: string;
+  COOKIE_SECURE?: "true" | "false";
+};
+
 export default fp(
   async (app) => {
-    const cookieName = app.config.JWT_COOKIE ?? "token";
-    const cookieSecret = app.config.COOKIE_SECRET;
-    const jwtSecret = app.config.JWT_SECRET;
+    const cfg = app.config as typeof app.config & CfgExtra;
+
+    const cookieName = cfg.JWT_COOKIE ?? "token";
+    const cookieSecret = cfg.COOKIE_SECRET;
+    const jwtSecret = cfg.JWT_SECRET;
     if (!cookieSecret) throw new Error("COOKIE_SECRET is required");
     if (!jwtSecret) throw new Error("JWT_SECRET is required");
 
@@ -42,7 +54,6 @@ export default fp(
     }
 
     const PUBLIC_PREFIXES = [
-      "/",
       "/health",
       "/docs",
       "/docs/json",
@@ -80,6 +91,8 @@ export default fp(
       "/api/ads",
     ];
 
+    const CLIENT_ORIGIN = cfg.APP_ORIGIN || process.env.APP_ORIGIN || "http://localhost:5173";
+
     app.addHook("preHandler", async (req, reply) => {
       if (req.method === "OPTIONS") return;
 
@@ -93,7 +106,7 @@ export default fp(
       } catch {
         if (PROTECTED_PREFIXES.some((p) => clean.startsWith(p))) {
           const next = clean.replace(/^\/api/, "");
-          return reply.code(302).redirect(`/auth/login?next=${encodeURIComponent(next)}`);
+          return reply.redirect(`${CLIENT_ORIGIN}/login?next=${encodeURIComponent(next)}`, 302);
         }
 
         return reply.unauthorized();

@@ -22,9 +22,15 @@ function readDeepLinkToken(req: FastifyRequest): string | undefined {
 
 const pagesRoutes: FastifyPluginAsync = async (app) => {
   const cfg = app.config as typeof app.config & CfgExtra;
-
   const CLIENT_ORIGIN = cfg.APP_ORIGIN || process.env.APP_ORIGIN || "http://localhost:5173";
   const cookieName = cfg.JWT_COOKIE ?? "token";
+
+  const redirectToLogin = (req: FastifyRequest, reply: FastifyReply) => {
+    const clean = (req.raw.url ?? req.url).split("?")[0] || "/ads-debug";
+    const next = encodeURIComponent(clean.replace(/^\/api/, ""));
+
+    reply.redirect(`${CLIENT_ORIGIN}/login?next=${next}`, 302);
+  };
 
   async function ensureAuth(req: FastifyRequest, reply: FastifyReply): Promise<boolean> {
     const token = readDeepLinkToken(req);
@@ -33,7 +39,10 @@ const pagesRoutes: FastifyPluginAsync = async (app) => {
         const decoded = app.jwt.verify<JwtUser>(token);
         (req as FastifyRequest & { user?: JwtUser }).user = decoded;
         return true;
-      } catch {}
+      } catch {
+        redirectToLogin(req, reply);
+        return false;
+      }
     }
 
     const auth = req.headers.authorization;
@@ -51,8 +60,7 @@ const pagesRoutes: FastifyPluginAsync = async (app) => {
       }
     } catch {}
 
-    const next = encodeURIComponent((req.raw.url ?? req.url).split("?")[0] || "/ads-debug");
-    reply.redirect(`/auth/login?next=${next}`, 302);
+    redirectToLogin(req, reply);
     return false;
   }
 
