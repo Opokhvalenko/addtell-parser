@@ -9,13 +9,19 @@ import {
 } from "./schemas.js";
 import { loginUser, registerUser } from "./service.js";
 
-type CfgExtra = { COOKIE_SECURE?: "true" | "false"; APP_ORIGIN?: string; NODE_ENV?: string };
+type CfgExtra = {
+  COOKIE_SECURE?: "true" | "false";
+  APP_ORIGIN?: string;
+  NODE_ENV?: string;
+  JWT_COOKIE?: string;
+};
 
 const routes: FastifyPluginAsync = async (app) => {
   const cfg = app.config as typeof app.config & CfgExtra;
 
   const isProd = cfg.NODE_ENV === "production";
   const crossSite = isProd && !(cfg.APP_ORIGIN ?? "").includes("localhost");
+  const cookieName = cfg.JWT_COOKIE ?? "token";
 
   const cookieOpts = {
     httpOnly: true,
@@ -26,7 +32,6 @@ const routes: FastifyPluginAsync = async (app) => {
     maxAge: 60 * 60 * 24 * 30,
   } as const;
 
-  // POST /api/auth/register
   app.post<{ Body: RegisterBody }>(
     "/register",
     {
@@ -37,7 +42,7 @@ const routes: FastifyPluginAsync = async (app) => {
       try {
         const u = await registerUser(app, req.body.email, req.body.password);
         const token = await reply.jwtSign({ id: u.id, email: u.email });
-        reply.setCookie("token", token, cookieOpts).code(201);
+        reply.setCookie(cookieName, token, cookieOpts).code(201);
         return { token };
       } catch (error) {
         if (error instanceof Error && error.message === "Email already registered") {
@@ -50,7 +55,6 @@ const routes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // POST /api/auth/login
   app.post<{ Body: LoginBody }>(
     "/login",
     {
@@ -60,7 +64,7 @@ const routes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       try {
         const { token } = await loginUser(app, req.body.email, req.body.password);
-        reply.setCookie("token", token, cookieOpts);
+        reply.setCookie(cookieName, token, cookieOpts);
         return { token };
       } catch (error) {
         req.log.warn({ err: error }, "login failed");
@@ -69,7 +73,6 @@ const routes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // GET /api/auth/me
   app.get(
     "/me",
     { preHandler: app.authenticate, schema: { response: { 200: MeResponseSchema } } },
@@ -78,7 +81,7 @@ const routes: FastifyPluginAsync = async (app) => {
         const u = req.user as { id?: string; email?: string } | undefined;
         if (!u?.id || !u?.email) return reply.unauthorized();
         const token =
-          (req.cookies?.token as string | undefined) ||
+          (req.cookies?.[cookieName] as string | undefined) ||
           (await reply.jwtSign({ id: u.id, email: u.email }));
         return { id: u.id, email: u.email, token };
       } catch (err) {
@@ -88,9 +91,8 @@ const routes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // POST /api/auth/logout
   app.post("/logout", { config: { public: true } }, async (_req, reply) => {
-    reply.clearCookie("token", {
+    reply.clearCookie(cookieName, {
       path: "/",
       sameSite: cookieOpts.sameSite,
       secure: cookieOpts.secure,

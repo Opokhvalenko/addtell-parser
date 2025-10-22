@@ -1,7 +1,15 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { renderCreateLineItem } from "../../modules/adserver/ssr/pages/create-lineitem.js";
+import "@fastify/jwt";
 
 type JwtUser = { id: string; email: string };
+
+type CfgExtra = {
+  APP_ORIGIN?: string;
+  JWT_COOKIE?: string;
+  NODE_ENV?: string;
+  COOKIE_SECURE?: "true" | "false";
+};
 
 function readDeepLinkToken(req: FastifyRequest): string | undefined {
   const q = req.query as unknown;
@@ -13,7 +21,10 @@ function readDeepLinkToken(req: FastifyRequest): string | undefined {
 }
 
 const pagesRoutes: FastifyPluginAsync = async (app) => {
-  const CLIENT_ORIGIN = app.config?.APP_ORIGIN || process.env.APP_ORIGIN || "http://localhost:5173";
+  const cfg = app.config as typeof app.config & CfgExtra;
+
+  const CLIENT_ORIGIN = cfg.APP_ORIGIN || process.env.APP_ORIGIN || "http://localhost:5173";
+  const cookieName = cfg.JWT_COOKIE ?? "token";
 
   async function ensureAuth(req: FastifyRequest, reply: FastifyReply): Promise<boolean> {
     const token = readDeepLinkToken(req);
@@ -22,19 +33,27 @@ const pagesRoutes: FastifyPluginAsync = async (app) => {
         const decoded = app.jwt.verify<JwtUser>(token);
         (req as FastifyRequest & { user?: JwtUser }).user = decoded;
         return true;
-      } catch {
-        reply.code(401).send({ error: "Invalid token" });
-        return false;
-      }
+      } catch {}
     }
 
+    const auth = req.headers.authorization;
+    const hasBearer = typeof auth === "string" && /^bearer\s+/i.test(auth);
+    const hasCookie = Boolean(req.cookies?.[cookieName]);
+
     try {
-      await app.authenticate(req, reply);
-      return true;
-    } catch {
-      reply.code(401).send({ error: "Token required" });
-      return false;
-    }
+      if (hasBearer) {
+        await req.jwtVerify();
+        return true;
+      }
+      if (hasCookie) {
+        await req.jwtVerify({ onlyCookie: true });
+        return true;
+      }
+    } catch {}
+
+    const next = encodeURIComponent((req.raw.url ?? req.url).split("?")[0] || "/ads-debug");
+    reply.redirect(`/auth/login?next=${next}`, 302);
+    return false;
   }
 
   const renderCreate = async (req: FastifyRequest, reply: FastifyReply) => {
