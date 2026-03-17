@@ -19,7 +19,8 @@
       "!coverage",
       "!public/assets",
       "!src/ssr/embed.css",
-      "!src/embed.css"
+      "!src/embed.css",
+      "!public/ads/feeds.json"
     ],
     "ignoreUnknown": true
   }
