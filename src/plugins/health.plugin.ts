@@ -35,7 +35,6 @@ function getPrisma(app: FastifyInstance): PrismaClient | undefined {
   return a.prisma;
 }
 
-// Mongo ($runCommandRaw) або SQL ($queryRaw)
 async function probePrisma(app: FastifyInstance) {
   const prisma = getPrisma(app);
   if (!prisma) return { ok: false, error: "missing" };

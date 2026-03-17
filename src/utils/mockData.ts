@@ -1,9 +1,5 @@
 import type { StatRow } from "../modules/stats/types.js";
 
-/**
- * Mock дані для статистики - використовуються коли ClickHouse недоступний
- * або повертає порожні результати
- */
 export const MOCK_STATS_DATA: StatRow[] = [
   {
     ts: "2025-01-03T00:00:00.000Z",
