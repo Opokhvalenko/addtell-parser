@@ -63,7 +63,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     ignorePattern:
-      /^(otel|health|security-headers|rate-limit|audit-logging|jwt|auth|analytics|cookie|stats-alias|swagger)\.plugin\.(js|mjs|cjs)$/i,
+      /^(otel|health|security-headers|rate-limit|audit-logging|jwt|auth|analytics|cookie|stats-alias|swagger)\.plugin\.(js|mjs|cjs|ts|mts|cts)$/i,
     encapsulate: true,
   });
 
