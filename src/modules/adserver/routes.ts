@@ -219,44 +219,7 @@ const routes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.post<{ Body: { name: string; html: string; width: number; height: number } }>(
-    "/creatives",
-    { preHandler: app.authenticate },
-    async (req, reply) => {
-      if (!req.user) return reply.unauthorized();
-      const userId = (req.user as { id: string }).id;
-      const { name, html, width, height } = req.body;
-
-      if (!name?.trim() || !html?.trim()) {
-        throw app.httpErrors.badRequest("name and html are required");
-      }
-      if (!(width > 0) || !(height > 0)) {
-        throw app.httpErrors.badRequest("width and height must be positive numbers");
-      }
-      const safe = htmlLooksSafe(html);
-      if (!safe.ok) throw app.httpErrors.badRequest(`html not allowed: ${safe.reason}`);
-
-      const uploadsDir = await ensureUploadsDir(app);
-      const filename = `${name.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.html`;
-      const filePath = path.join(uploadsDir, filename);
-      await writeFile(filePath, html, "utf8");
-
-      const creative = await app.prisma.creative.create({
-        data: {
-          ownerId: userId,
-          filename,
-          url: `/uploads/creatives/${filename}`,
-          mime: "text/html",
-          html,
-          width,
-          height,
-        },
-        select: { id: true, url: true, filename: true, mime: true },
-      });
-
-      return reply.code(201).send(creative);
-    },
-  );
+  // POST /creatives moved to modules/creatives/routes.ts (was duplicated here)
 
   app.post("/ads/lineitems", { preHandler: [app.authenticate] }, async (req, reply) => {
     if (!req.user) return reply.unauthorized();

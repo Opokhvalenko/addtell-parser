@@ -32,6 +32,99 @@
       };
       shadow.appendChild(tw);
 
+      // Override styles to match the main app's glass-morphism design
+      const overrideStyle = document.createElement('style');
+      overrideStyle.textContent = `
+        .panel {
+          border-radius: 1.5rem;
+          background: rgba(255,255,255,0.9);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255,255,255,0.2);
+          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
+        }
+        :is(.dark,.dark *) .panel,
+        :is([data-theme=dark],[data-theme=dark] *) .panel {
+          background: rgba(30,41,59,0.9);
+          border-color: rgba(100,116,139,0.3);
+        }
+        #li-form input:not([type=checkbox]):not([type=file]),
+        #li-form select,
+        #li-form textarea {
+          border-radius: 0.75rem;
+          padding: 0.625rem 1rem;
+          font-size: 0.9375rem;
+          border: 1px solid rgba(148,163,184,0.4);
+          background: rgba(248,250,252,0.8);
+          transition: all 0.2s ease;
+        }
+        #li-form input:not([type=checkbox]):not([type=file]):focus,
+        #li-form select:focus,
+        #li-form textarea:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+        :is(.dark,.dark *) #li-form input:not([type=checkbox]):not([type=file]),
+        :is(.dark,.dark *) #li-form select,
+        :is(.dark,.dark *) #li-form textarea,
+        :is([data-theme=dark],[data-theme=dark] *) #li-form input:not([type=checkbox]):not([type=file]),
+        :is([data-theme=dark],[data-theme=dark] *) #li-form select,
+        :is([data-theme=dark],[data-theme=dark] *) #li-form textarea {
+          background: rgba(51,65,85,0.6);
+          border-color: rgba(100,116,139,0.5);
+        }
+        #li-form label {
+          font-weight: 500;
+          font-size: 0.875rem;
+          letter-spacing: -0.01em;
+        }
+        .li-section-title {
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: #94a3b8;
+          padding-bottom: 0.5rem;
+          border-bottom: 1px solid rgba(148,163,184,0.2);
+          margin-bottom: 1rem;
+        }
+        #submitBtn {
+          border-radius: 0.75rem;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+          padding: 0.75rem 1.5rem;
+          transition: all 0.2s ease;
+        }
+        #submitBtn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 10px 25px -5px rgba(59,130,246,0.3);
+        }
+        #submitBtn:active {
+          transform: translateY(0);
+        }
+        .btn-ghost {
+          border-radius: 0.5rem;
+          font-weight: 500;
+          transition: all 0.15s ease;
+        }
+        .welcome-bar {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1rem;
+          border-radius: 0.75rem;
+          background: rgba(59,130,246,0.06);
+          border: 1px solid rgba(59,130,246,0.12);
+          margin-bottom: 1.5rem;
+        }
+        :is(.dark,.dark *) .welcome-bar,
+        :is([data-theme=dark],[data-theme=dark] *) .welcome-bar {
+          background: rgba(59,130,246,0.1);
+          border-color: rgba(59,130,246,0.2);
+        }
+      `;
+      shadow.appendChild(overrideStyle);
+
       const wrap = document.createElement('div');
       wrap.className = 'max-w-3xl mx-auto p-6';
       wrap.innerHTML = `
@@ -44,13 +137,18 @@
 
         <!-- картка форми -->
         <div class="panel text-slate-900 dark:text-slate-100 p-6 md:p-8">
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Welcome, <strong class="text-blue-600">%%USER_EMAIL%%</strong>
-          </p>
+          <div class="welcome-bar">
+            <span style="font-size:1.1rem">👋</span>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Welcome, <strong class="text-blue-600">%%USER_EMAIL%%</strong>
+            </p>
+          </div>
 
           <form id="li-form" class="space-y-6" method="post" action="/ads/lineitems"
                 enctype="multipart/form-data" novalidate>
             <input type="hidden" name="csrfToken" value="%%CSRF_TOKEN%%" />
+
+            <div class="li-section-title">Basic Info</div>
 
             <div>
               <label class="block text-sm font-medium mb-2">Name</label>
@@ -67,6 +165,8 @@
               <p class="hint">Comma-separated list supported.</p>
               <div class="err" data-err="sizes"></div>
             </div>
+
+            <div class="li-section-title">Pricing & Targeting</div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -96,6 +196,8 @@
               </div>
             </div>
 
+            <div class="li-section-title">Schedule</div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium mb-2">Start</label>
@@ -117,6 +219,8 @@
                 <label for="active" class="text-sm">Active</label>
               </div>
             </div>
+
+            <div class="li-section-title">Creative</div>
 
             <div>
               <label class="block text-sm font-medium mb-2">Click-through URL (optional)</label>
