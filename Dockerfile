@@ -1,5 +1,5 @@
 # --- build stage ---
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # deps (ставимо з devDeps, щоб був tailwindcss)
@@ -44,7 +44,7 @@ RUN npm prune --omit=dev
 
 
 # --- runtime stage ---
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache libstdc++ openssl ca-certificates && update-ca-certificates
