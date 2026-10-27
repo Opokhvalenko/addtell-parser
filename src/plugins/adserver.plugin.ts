@@ -8,6 +8,7 @@ export default fp(
   },
   {
     name: "adserver",
-    dependencies: [],
+    // The multipart parser must exist before the form route is registered (otherwise 415)
+    dependencies: ["multipart"],
   },
 );
