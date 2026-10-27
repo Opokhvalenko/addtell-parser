@@ -63,67 +63,30 @@ export default fp(
         if (!(await app.verifyAccess(req))) return reply.unauthorized();
       });
     }
-    const PUBLIC_EXACT = new Set<string>(["/", "/favicon.ico", "/robots.txt"]);
-    const PUBLIC_PREFIXES = [
-      "/health",
-      "/docs",
-      "/docs/json",
-      "/docs/yaml",
-      "/public",
-      "/uploads",
-      "/assets/tw-embed.css",
+    /**
+     * Deny by default: every route needs a valid access token unless it is marked
+     * `config: { public: true }`. The only other exceptions are the static file mounts
+     * (public assets by design — a missing file answers 404) and the API docs.
+     */
+    const PUBLIC_STATIC_ROUTES = new Set(["/*", "/public/*", "/uploads/*"]);
+    const DOCS_ROUTE = "/docs";
+    const isDocsRoute = (route: string) =>
+      route === DOCS_ROUTE || route.startsWith(`${DOCS_ROUTE}/`);
 
-      "/api/analytics",
-      "/api/stats",
-      "/api/adserver/stats",
-
-      "/feed",
-      "/api/feed",
-      "/api/article",
-      "/api/bid",
-      "/api/analytics/events",
-      "/api/analytics/stats",
-
-      "/auth/login",
-      "/auth/register",
-      "/auth/logout",
-      "/api/auth/login",
-      "/api/auth/register",
-      "/api/auth/logout",
-    ];
-
-    const PROTECTED_PREFIXES = [
-      "/ads-debug",
-      "/create-lineitem",
-      "/demo",
-      "/api/ads-debug",
-      "/api/create-lineitem",
-      "/api/demo",
-      "/api/ads",
-    ];
-
-    const CLIENT_ORIGIN = cfg.APP_ORIGIN || process.env.APP_ORIGIN || "http://localhost:5173";
-
-    app.addHook("preHandler", async (req, reply) => {
+    // onRequest, not preHandler: the session is checked before the body is parsed and
+    // validated, so anonymous callers never learn a route's schema from 400 errors
+    app.addHook("onRequest", async (req, reply) => {
       if (req.method === "OPTIONS") return;
 
-      const clean = (req.raw.url ?? req.url).split("?")[0] || "";
+      const route = req.routeOptions?.url;
+      // No matched route: the 404 handler answers
+      if (route === undefined) return;
+      if (req.routeOptions.config?.public === true) return;
+      if (PUBLIC_STATIC_ROUTES.has(route) || isDocsRoute(route)) return;
 
-      if (PUBLIC_EXACT.has(clean)) return;
-
-      if (req.routeOptions?.config?.public === true) return;
-
-      if (PUBLIC_PREFIXES.some((p) => clean.startsWith(p))) return;
-
-      try {
-        await app.authenticate(req, reply);
-      } catch {
-        if (PROTECTED_PREFIXES.some((p) => clean.startsWith(p))) {
-          const next = clean.replace(/^\/api/, "");
-          return reply.redirect(`${CLIENT_ORIGIN}/login?next=${encodeURIComponent(next)}`, 302);
-        }
-        return reply.unauthorized();
-      }
+      // Return the reply (Fastify's rule for async hooks). The old preHandler version did not,
+      // and unauthenticated requests to the static wildcard route hung.
+      if (!(await app.verifyAccess(req))) return reply.unauthorized();
     });
   },
   { name: "jwt" },

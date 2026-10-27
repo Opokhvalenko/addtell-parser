@@ -37,7 +37,10 @@ const feedRoutes: FastifyPluginAsync = async (app) => {
 
   app.get<{ Querystring: FeedQuery; Reply: FeedResponse }>(
     "/feed",
-    { schema: { querystring: FeedQuerySchema, response: { 200: FeedResponseSchema } } },
+    {
+      config: { public: true },
+      schema: { querystring: FeedQuerySchema, response: { 200: FeedResponseSchema } },
+    },
     async (req, _reply) => {
       app.log.info({ query: req.query }, "GET /feed: incoming");
 

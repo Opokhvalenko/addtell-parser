@@ -10,6 +10,7 @@ import configPlugin from "./config/index.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 export type AppOptions = Partial<FastifyServerOptions>;
+const DEFAULT_TRUST_PROXY_HOPS = 1;
 
 function makeLogger(usePretty: boolean) {
   const level = process.env.LOG_LEVEL ?? "info";
@@ -40,7 +41,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 
   const app = Fastify({
     ...options,
-    trustProxy: true,
+    // Render puts exactly one proxy in front of the app. `true` would trust every
+    // X-Forwarded-For entry, so clients could pick their own IP (and rate-limit key).
+    trustProxy: Number(process.env.TRUST_PROXY_HOPS ?? DEFAULT_TRUST_PROXY_HOPS),
     logger: makeLogger(usePretty),
     disableRequestLogging: !isProd,
     pluginTimeout: 30000,
@@ -57,6 +60,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register((await import("./plugins/audit-logging.plugin.js")).default);
 
   await app.register((await import("./plugins/jwt.plugin.js")).default);
+  await app.register((await import("./plugins/cookie.plugin.js")).default);
   await app.register((await import("./plugins/auth.plugin.js")).default);
   await app.register((await import("./plugins/analytics.plugin.js")).default);
 

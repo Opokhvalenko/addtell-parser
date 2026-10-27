@@ -1,50 +1,36 @@
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import fp from "fastify-plugin";
 
+const BAD_REQUEST = 400;
+const CONFLICT = 409;
+const SERVER_ERROR = 500;
+
 export default fp(
   async (app) => {
     app.setErrorHandler(async (error, request, reply) => {
-      request.log.error(
-        {
-          error: error.message,
-          stack: error.stack,
-          url: request.url,
-          method: request.method,
-          statusCode: error.statusCode,
-          name: error.name,
-        },
-        "Unhandled error",
-      );
-
+      // Unique-constraint violations: a client conflict, but never say which value exists
       if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
-        reply.code(409);
-        return {
-          error: "Email already registered",
-          statusCode: 409,
-        };
+        request.log.warn({ code: error.code, url: request.url }, "Unique constraint violation");
+        return reply.code(CONFLICT).send({ error: "Conflict", statusCode: CONFLICT });
       }
 
-      if (error.statusCode === 400 || error.validation) {
-        reply.code(400);
-        return {
-          error: error.message,
-          statusCode: 400,
-        };
+      const statusCode = error.validation
+        ? BAD_REQUEST
+        : error.statusCode && error.statusCode >= BAD_REQUEST
+          ? error.statusCode
+          : SERVER_ERROR;
+
+      if (statusCode >= SERVER_ERROR) {
+        request.log.error(
+          { err: error, url: request.url, method: request.method },
+          "Unhandled error",
+        );
+        // Internal details (stack, upstream messages, hostnames) stay in the logs
+        return reply.code(statusCode).send({ error: "Internal Server Error", statusCode });
       }
 
-      if (error.statusCode) {
-        reply.code(error.statusCode);
-        return {
-          error: error.message,
-          statusCode: error.statusCode,
-        };
-      }
-
-      reply.code(500);
-      return {
-        error: "Internal Server Error",
-        statusCode: 500,
-      };
+      request.log.warn({ statusCode, url: request.url, msg: error.message }, "Client error");
+      return reply.code(statusCode).send({ error: error.message, statusCode });
     });
 
     app.setNotFoundHandler(async (request, reply) => {
