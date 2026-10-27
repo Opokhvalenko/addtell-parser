@@ -2,6 +2,9 @@ import { type Cheerio, type CheerioAPI, load } from "cheerio";
 import type { AnyNode, Element } from "domhandler";
 import { isTag } from "domutils";
 import type { FastifyInstance } from "fastify";
+import { type SafeFetchResult, safeFetch, UnsafeUrlError } from "../../utils/safe-fetch.js";
+
+const ARTICLE_ACCEPT = "text/html,application/xhtml+xml";
 
 export type ParsedArticle = {
   url: string;
@@ -171,25 +174,22 @@ export async function parseArticleByUrl(
 
   app.log.info({ url: inputUrl }, "article: fetch start");
 
-  let res: Response;
+  // SSRF guard: the URL comes from the user
+  let res: SafeFetchResult;
   try {
-    res = await fetch(inputUrl, {
-      headers: {
-        "User-Agent": "AddTellParser/1.0 (+https://example.com)",
-        Accept: "text/html,application/xhtml+xml",
-      },
-    });
+    res = await safeFetch(inputUrl, { accept: ARTICLE_ACCEPT });
   } catch (error) {
+    if (error instanceof UnsafeUrlError) throw error;
     const errorMessage = error instanceof Error ? error.message : String(error);
     app.log.error({ url: inputUrl, error: errorMessage }, "article: network error");
     throw new Error("Failed to fetch article");
   }
-  if (!res.ok) {
+  if (res.status < 200 || res.status >= 300) {
     app.log.error({ url: inputUrl, status: res.status }, "article: fetch failed");
     throw new Error(`Upstream responded ${res.status}`);
   }
 
-  const htmlRaw = await res.text();
+  const htmlRaw = res.body;
   const $ = load(htmlRaw);
 
   const canonicalRaw = firstNonEmpty(

@@ -10,6 +10,7 @@ import {
   type FeedResponse,
   FeedResponseSchema,
 } from "./schemas.js";
+import { allowedFeedUrls } from "./sources.js";
 
 function toStr(x: unknown): string {
   if (typeof x === "string") return x;
@@ -34,6 +35,7 @@ function normalizeItem(i: unknown): FeedItemResponse {
 
 const feedRoutes: FastifyPluginAsync = async (app) => {
   app.register(articleRoutes);
+  const allowedFeeds = allowedFeedUrls(app.config);
 
   app.get<{ Querystring: FeedQuery; Reply: FeedResponse }>(
     "/feed",
@@ -45,7 +47,11 @@ const feedRoutes: FastifyPluginAsync = async (app) => {
       app.log.info({ query: req.query }, "GET /feed: incoming");
 
       const cfgUrl = app.config.DEFAULT_FEED_URL;
-      const url = typeof req.query.url === "string" ? req.query.url : cfgUrl;
+      const requested = typeof req.query.url === "string" ? req.query.url : undefined;
+      if (requested && !allowedFeeds.has(requested)) {
+        throw app.httpErrors.badRequest("Feed URL is not in the list of configured sources");
+      }
+      const url = requested ?? cfgUrl;
       if (!url) {
         throw new Error("DEFAULT_FEED_URL is not set");
       }
