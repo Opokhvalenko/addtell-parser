@@ -62,7 +62,8 @@ const routes: FastifyPluginAsync = async (app) => {
     "/bid",
     {
       schema: { querystring: BidQuerySchema },
-      config: { rateLimit: { max: 120 } },
+      // Called anonymously by publisher pages
+      config: { public: true, rateLimit: { max: 120 } },
     },
     async (req, reply) => {
       const startedAt = Date.now();

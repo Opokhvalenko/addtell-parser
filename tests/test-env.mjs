@@ -14,6 +14,8 @@ const TEST_DEFAULTS = {
   CRON_ENABLE: "false",
   LOG_LEVEL: "silent",
   OTEL_SDK_DISABLED: "true",
+  // Suites register many users from one address; the limit itself has its own test
+  AUTH_RATE_LIMIT_MAX: "1000",
 };
 
 for (const [key, value] of Object.entries(TEST_DEFAULTS)) {

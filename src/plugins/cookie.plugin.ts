@@ -8,6 +8,12 @@ declare module "fastify" {
 }
 
 const UID_COOKIE = "uid";
+/**
+ * The anonymous id is needed only for frequency capping in the bid route. Setting it on every
+ * response would also put it on long-cached static files, where a shared cache could hand one
+ * id to every visitor.
+ */
+const UID_ROUTES = new Set(["/api/bid"]);
 
 type CfgExtra = { COOKIE_SECURE?: "true" | "false"; APP_ORIGIN?: string };
 
@@ -20,6 +26,7 @@ export default fp(
       isProd && !(cfg.APP_ORIGIN ?? "").includes("localhost") ? "none" : "lax";
 
     app.addHook("onRequest", async (req, reply) => {
+      if (!UID_ROUTES.has(req.routeOptions?.url ?? "")) return;
       const raw = req.cookies?.[UID_COOKIE] as string | undefined;
       let id: string | undefined;
 

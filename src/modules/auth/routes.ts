@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { authRateLimit } from "../../plugins/rate-limit.plugin.js";
 import {
   type LoginBody,
   LoginBodySchema,
@@ -24,6 +25,7 @@ import {
 
 const routes: FastifyPluginAsync = async (app) => {
   await warmUpLoginTiming();
+  const authLimit = authRateLimit(app);
 
   const readRefreshCookie = (raw: string | undefined): string | undefined => {
     if (!raw) return undefined;
@@ -34,7 +36,7 @@ const routes: FastifyPluginAsync = async (app) => {
   app.post<{ Body: RegisterBody }>(
     "/register",
     {
-      config: { public: true },
+      config: { public: true, rateLimit: authLimit },
       schema: { body: RegisterBodySchema, response: { 201: SessionUserSchema } },
     },
     async (req, reply) => {
@@ -52,7 +54,7 @@ const routes: FastifyPluginAsync = async (app) => {
   app.post<{ Body: LoginBody }>(
     "/login",
     {
-      config: { public: true },
+      config: { public: true, rateLimit: authLimit },
       schema: { body: LoginBodySchema, response: { 200: SessionUserSchema } },
     },
     async (req, reply) => {
@@ -69,7 +71,10 @@ const routes: FastifyPluginAsync = async (app) => {
 
   app.post(
     "/refresh",
-    { config: { public: true }, schema: { response: { 200: SessionUserSchema } } },
+    {
+      config: { public: true, rateLimit: authLimit },
+      schema: { response: { 200: SessionUserSchema } },
+    },
     async (req, reply) => {
       const refreshToken = readRefreshCookie(req.cookies?.[REFRESH_COOKIE]);
       const user = refreshToken ? await rotateSession(app, reply, refreshToken) : null;

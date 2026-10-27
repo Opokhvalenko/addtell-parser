@@ -61,7 +61,7 @@ export default fp(
 
         r.get(
           "/stats",
-          { schema: { querystring: statsQuerySchema }, logLevel: "info" },
+          { config: { public: true }, schema: { querystring: statsQuerySchema }, logLevel: "info" },
           async (req) => {
             const q = req.query as { from: string; to: string; groupBy?: string; metrics?: string };
             const groupBy = (q.groupBy ?? "day")

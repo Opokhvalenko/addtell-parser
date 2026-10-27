@@ -77,9 +77,15 @@ export default fp(
       };
     }
 
-    const handler = async (_req: FastifyRequest, reply: FastifyReply) => {
+    const handler = async (req: FastifyRequest, reply: FastifyReply) => {
       const res = await probe();
-      reply.code(res.status === "down" ? 503 : 200).send(res);
+      const failures = Object.entries(res.checks).filter(([, check]) => !check.ok);
+      if (failures.length > 0) req.log.warn({ failures }, "health check failed");
+      // Public endpoint: report only up/down, error texts (hosts, drivers) go to the logs
+      const checks = Object.fromEntries(
+        Object.entries(res.checks).map(([name, check]) => [name, { ok: check.ok }]),
+      );
+      reply.code(res.status === "down" ? 503 : 200).send({ ...res, checks });
     };
 
     const routeOpts = { config: { public: true, rateLimit: false } } as const;
