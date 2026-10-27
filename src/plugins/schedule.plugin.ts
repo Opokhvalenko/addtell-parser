@@ -3,6 +3,7 @@ import * as path from "node:path";
 import schedule from "@fastify/schedule";
 import fp from "fastify-plugin";
 import { CronJob, Task } from "toad-scheduler";
+import { configuredFeedSources } from "../modules/feed/sources.js";
 import { withRetry } from "../utils/retry.js";
 export default fp(async (app) => {
   const cronEnabled = String(app.config.CRON_ENABLE).toLowerCase() !== "false";
@@ -15,24 +16,7 @@ export default fp(async (app) => {
   const CRON = app.config.CRON_FEEDS_SCHEDULE;
   const TZ = app.config.CRON_TZ;
   const FEEDS_URL = app.config.FEEDS_URL || "";
-  const FEEDS_SOURCES_RAW = app.config.FEEDS_SOURCES || "";
-  const DEFAULT_FEED_URL = app.config.DEFAULT_FEED_URL || "";
-  function parseSources(): string[] {
-    const raw = FEEDS_SOURCES_RAW.trim();
-    if (raw.startsWith("[")) {
-      try {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) return arr.map(String);
-      } catch {}
-    }
-    if (raw) {
-      return raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
-    return DEFAULT_FEED_URL ? [DEFAULT_FEED_URL] : [];
-  }
+  const parseSources = () => configuredFeedSources(app.config);
   async function writeOut(data: unknown) {
     await fs.mkdir(path.dirname(OUT), { recursive: true });
     await fs.writeFile(OUT, JSON.stringify(data, null, 2));

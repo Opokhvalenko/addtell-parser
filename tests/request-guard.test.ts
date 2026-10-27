@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert";
 import { after, before, describe, test } from "node:test";
-import type { FastifyInstance } from "fastify";
+import sensible from "@fastify/sensible";
+import Fastify, { type FastifyInstance } from "fastify";
+import errorHandling from "../src/plugins/error-handling.plugin.js";
 import { closeTestApp, createTestApp } from "./setup.js";
 
 /** A request that hangs is the bug this guards against; anything slower than this is a failure. */
@@ -87,8 +89,14 @@ describe("request guard", () => {
   });
 
   test("server errors do not leak internal messages", async () => {
-    // A feed URL that cannot be fetched makes the route fail with a 500
-    const res = await app.inject({ method: "GET", url: "/api/feed?url=http://127.0.0.1:1/x" });
+    const probe = Fastify({ logger: false });
+    await probe.register(sensible);
+    await probe.register(errorHandling);
+    probe.get("/boom", async () => {
+      throw new Error("connect ECONNREFUSED clickhouse.internal:8123");
+    });
+    const res = await probe.inject({ method: "GET", url: "/boom" });
+    await probe.close();
     assert.equal(res.statusCode, 500);
     assert.deepEqual(res.json(), { error: "Internal Server Error", statusCode: 500 });
   });
