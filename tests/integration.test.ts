@@ -16,8 +16,6 @@ test("Integration - Complete user flow", async () => {
     });
 
     assert.strictEqual(registerResponse.statusCode, 201);
-    const { token } = registerResponse.json() as { token: string };
-    assert.ok(token);
 
     // 2. Login with the user
     const loginResponse = await app.inject({
@@ -30,7 +28,8 @@ test("Integration - Complete user flow", async () => {
     });
 
     assert.strictEqual(loginResponse.statusCode, 200);
-    const { token: loginToken } = loginResponse.json() as { token: string };
+    // The access token is only in the httpOnly cookie (signed value)
+    const loginToken = loginResponse.cookies.find((c) => c.name === "token")?.value;
     assert.ok(loginToken);
 
     // 3. Get user info
@@ -43,7 +42,7 @@ test("Integration - Complete user flow", async () => {
     });
 
     assert.strictEqual(meResponse.statusCode, 200);
-    const userInfo = meResponse.json() as { id: string; email: string; token: string };
+    const userInfo = meResponse.json() as { id: string; email: string };
     assert.strictEqual(userInfo.email, "integration@example.com");
     assert.ok(userInfo.id);
 
