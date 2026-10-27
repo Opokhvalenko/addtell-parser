@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
-  url      = env("DATABASE_URL")
+  provider  = "mongodb"
+  url       = env("DATABASE_URL")
   directUrl = env("DATABASE_URL")
 }
 
@@ -16,8 +16,23 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  creatives Creative[]
-  lineItems LineItem[]
+  creatives     Creative[]
+  lineItems     LineItem[]
+  refreshTokens RefreshToken[]
+}
+
+/// One row per issued refresh token. Only the SHA-256 hash is stored; a token is
+/// single-use: rotation marks it revoked and issues a new one.
+model RefreshToken {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Feed {

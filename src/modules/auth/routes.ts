@@ -1,56 +1,50 @@
 import type { FastifyPluginAsync } from "fastify";
 import {
-  AuthResponseSchema,
   type LoginBody,
   LoginBodySchema,
-  MeResponseSchema,
   type RegisterBody,
   RegisterBodySchema,
+  SessionUserSchema,
 } from "./schemas.js";
-import { loginUser, registerUser } from "./service.js";
-
-type CfgExtra = {
-  COOKIE_SECURE?: "true" | "false";
-  APP_ORIGIN?: string;
-  NODE_ENV?: string;
-  JWT_COOKIE?: string;
-};
+import {
+  EmailTakenError,
+  InvalidCredentialsError,
+  loginUser,
+  registerUser,
+  warmUpLoginTiming,
+} from "./service.js";
+import {
+  clearSessionCookies,
+  endSession,
+  REFRESH_COOKIE,
+  rotateSession,
+  type SessionUser,
+  startSession,
+} from "./session.js";
 
 const routes: FastifyPluginAsync = async (app) => {
-  const cfg = app.config as typeof app.config & CfgExtra;
+  await warmUpLoginTiming();
 
-  const isProd = cfg.NODE_ENV === "production";
-  const crossSite = isProd && !(cfg.APP_ORIGIN ?? "").includes("localhost");
-  const cookieName = cfg.JWT_COOKIE ?? "token";
-
-  const cookieOpts = {
-    httpOnly: true,
-    sameSite: (crossSite ? "none" : "lax") as "none" | "lax",
-    path: "/",
-    secure: crossSite || cfg.COOKIE_SECURE === "true",
-    signed: true,
-    maxAge: 60 * 60 * 24 * 30,
-  } as const;
+  const readRefreshCookie = (raw: string | undefined): string | undefined => {
+    if (!raw) return undefined;
+    const { valid, value } = app.unsignCookie(raw);
+    return valid && value ? value : undefined;
+  };
 
   app.post<{ Body: RegisterBody }>(
     "/register",
     {
       config: { public: true },
-      schema: { body: RegisterBodySchema, response: { 201: AuthResponseSchema } },
+      schema: { body: RegisterBodySchema, response: { 201: SessionUserSchema } },
     },
     async (req, reply) => {
       try {
-        const u = await registerUser(app, req.body.email, req.body.password);
-        const token = await reply.jwtSign({ id: u.id, email: u.email });
-        reply.setCookie(cookieName, token, cookieOpts).code(201);
-        return { token };
+        const user = await registerUser(app, req.body.email, req.body.password);
+        await startSession(app, reply, user);
+        return reply.code(201).send(user);
       } catch (error) {
-        if (error instanceof Error && error.message === "Email already registered") {
-          reply.code(409);
-          return { error: "Email already registered", statusCode: 409 };
-        }
-        req.log.error({ err: error }, "register failed");
-        return reply.internalServerError();
+        if (error instanceof EmailTakenError) return reply.conflict(error.message);
+        throw error;
       }
     },
   );
@@ -59,45 +53,45 @@ const routes: FastifyPluginAsync = async (app) => {
     "/login",
     {
       config: { public: true },
-      schema: { body: LoginBodySchema, response: { 200: AuthResponseSchema } },
+      schema: { body: LoginBodySchema, response: { 200: SessionUserSchema } },
     },
     async (req, reply) => {
       try {
-        const { token } = await loginUser(app, req.body.email, req.body.password);
-        reply.setCookie(cookieName, token, cookieOpts);
-        return { token };
+        const user = await loginUser(app, req.body.email, req.body.password);
+        await startSession(app, reply, user);
+        return user;
       } catch (error) {
-        req.log.warn({ err: error }, "login failed");
+        if (error instanceof InvalidCredentialsError) return reply.unauthorized();
+        throw error;
+      }
+    },
+  );
+
+  app.post(
+    "/refresh",
+    { config: { public: true }, schema: { response: { 200: SessionUserSchema } } },
+    async (req, reply) => {
+      const refreshToken = readRefreshCookie(req.cookies?.[REFRESH_COOKIE]);
+      const user = refreshToken ? await rotateSession(app, reply, refreshToken) : null;
+      if (!user) {
+        clearSessionCookies(app, reply);
         return reply.unauthorized();
       }
+      return user;
     },
   );
 
   app.get(
     "/me",
-    { preHandler: app.authenticate, schema: { response: { 200: MeResponseSchema } } },
-    async (req, reply) => {
-      try {
-        const u = req.user as { id?: string; email?: string } | undefined;
-        if (!u?.id || !u?.email) return reply.unauthorized();
-        const token =
-          (req.cookies?.[cookieName] as string | undefined) ||
-          (await reply.jwtSign({ id: u.id, email: u.email }));
-        return { id: u.id, email: u.email, token };
-      } catch (err) {
-        req.log.error({ err }, "/auth/me failed");
-        return reply.internalServerError();
-      }
+    { preHandler: app.authenticate, schema: { response: { 200: SessionUserSchema } } },
+    async (req) => {
+      const { id, email } = req.user as SessionUser;
+      return { id, email };
     },
   );
 
-  app.post("/logout", { config: { public: true } }, async (_req, reply) => {
-    reply.clearCookie(cookieName, {
-      path: "/",
-      sameSite: cookieOpts.sameSite,
-      secure: cookieOpts.secure,
-      signed: true,
-    });
+  app.post("/logout", { config: { public: true } }, async (req, reply) => {
+    await endSession(app, reply, readRefreshCookie(req.cookies?.[REFRESH_COOKIE]));
     return { ok: true };
   });
 };

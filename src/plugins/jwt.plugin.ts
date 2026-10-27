@@ -3,10 +3,13 @@ import fastifyJwt from "@fastify/jwt";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import "@fastify/jwt";
+import { ACCESS_TOKEN_TYPE, type AccessPayload } from "../modules/auth/session.js";
 
 declare module "fastify" {
   interface FastifyInstance {
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    /** True when the request carries a valid, unexpired access token (cookie or Bearer). */
+    verifyAccess: (req: FastifyRequest) => Promise<boolean>;
   }
 }
 
@@ -36,20 +39,28 @@ export default fp(
       await app.register(fastifyJwt, {
         secret: jwtSecret,
         cookie: { cookieName, signed: true },
+        // A token without an expiry is never accepted, even if correctly signed
+        verify: { requiredClaims: ["exp"] },
+      });
+    }
+
+    if (!app.hasDecorator("verifyAccess")) {
+      app.decorate("verifyAccess", async (req: FastifyRequest) => {
+        try {
+          const payload =
+            req.cookies?.[cookieName] && !req.headers.authorization
+              ? await req.jwtVerify<AccessPayload>({ onlyCookie: true })
+              : await req.jwtVerify<AccessPayload>();
+          return payload.tokenType === ACCESS_TOKEN_TYPE;
+        } catch {
+          return false;
+        }
       });
     }
 
     if (!app.hasDecorator("authenticate")) {
-      app.decorate("authenticate", async (req, reply) => {
-        try {
-          if (req.cookies?.[cookieName] && !req.headers.authorization) {
-            await req.jwtVerify({ onlyCookie: true });
-          } else {
-            await req.jwtVerify();
-          }
-        } catch {
-          return reply.unauthorized();
-        }
+      app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
+        if (!(await app.verifyAccess(req))) return reply.unauthorized();
       });
     }
     const PUBLIC_EXACT = new Set<string>(["/", "/favicon.ico", "/robots.txt"]);

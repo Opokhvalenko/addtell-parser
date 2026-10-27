@@ -38,6 +38,8 @@ const memoryUsage = meter.createUpDownCounter("memory_usage_bytes", {
 const logger = logs.getLogger(SERVICE_NAME, SERVICE_VERSION);
 
 export function initializeTelemetry(): void {
+  // Standard OpenTelemetry switch; tests set it so exporters and timers do not keep the process alive
+  if (process.env.OTEL_SDK_DISABLED === "true") return;
   if (sdk) {
     console.warn("[otel] SDK already initialized");
     return;
@@ -107,7 +109,7 @@ function startMemoryMonitoring(): void {
     memoryUsage.add(m.heapTotal, { type: "heap_total" });
     memoryUsage.add(m.rss, { type: "rss" });
     memoryUsage.add(m.external, { type: "external" });
-  }, 10_000);
+  }, 10_000).unref();
 }
 
 export function recordRequest(

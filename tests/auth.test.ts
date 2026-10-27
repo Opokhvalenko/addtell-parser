@@ -25,7 +25,9 @@ test("Auth Module - POST /auth/register should register a new user", async () =>
 
     assert.strictEqual(response.statusCode, 201);
     const body = JSON.parse(response.payload);
-    assert.ok(body.token);
+    assert.ok(body.id);
+    assert.strictEqual(body.token, undefined, "the token is set only as an httpOnly cookie");
+    assert.ok(response.cookies.some((c) => c.name === "token" && c.httpOnly));
   } finally {
     await closeTestApp(app);
   }
@@ -115,7 +117,8 @@ test("Auth Module - POST /auth/login should login with valid credentials", async
 
     assert.strictEqual(response.statusCode, 200);
     const body = JSON.parse(response.payload);
-    assert.ok(body.token);
+    assert.strictEqual(body.token, undefined, "the token is set only as an httpOnly cookie");
+    assert.ok(response.cookies.some((c) => c.name === "token" && c.httpOnly));
   } finally {
     await closeTestApp(app);
   }
@@ -140,13 +143,14 @@ test("Auth Module - GET /auth/me should return user info with valid token", asyn
       },
     });
 
-    const { token } = JSON.parse(registerResponse.payload);
+    const accessCookie = registerResponse.cookies.find((c) => c.name === "token")?.value;
+    assert.ok(accessCookie);
 
     const response = await app.inject({
       method: "GET",
       url: "/api/auth/me",
       headers: {
-        authorization: `Bearer ${token}`,
+        cookie: `token=${accessCookie}`,
       },
     });
 
@@ -154,7 +158,7 @@ test("Auth Module - GET /auth/me should return user info with valid token", asyn
     const body = JSON.parse(response.payload);
     assert.ok(body.id);
     assert.strictEqual(body.email, "test@example.com");
-    assert.ok(body.token);
+    assert.strictEqual(body.token, undefined);
   } finally {
     await closeTestApp(app);
   }

@@ -4,26 +4,11 @@ import "@fastify/jwt";
 
 type JwtUser = { id: string; email: string };
 
-type CfgExtra = {
-  APP_ORIGIN?: string;
-  JWT_COOKIE?: string;
-  NODE_ENV?: string;
-  COOKIE_SECURE?: "true" | "false";
-};
-
-function readDeepLinkToken(req: FastifyRequest): string | undefined {
-  const q = req.query as unknown;
-  if (q && typeof q === "object" && "token" in q) {
-    const v = (q as Record<string, unknown>).token;
-    return typeof v === "string" ? v : undefined;
-  }
-  return undefined;
-}
+type CfgExtra = { APP_ORIGIN?: string };
 
 const pagesRoutes: FastifyPluginAsync = async (app) => {
   const cfg = app.config as typeof app.config & CfgExtra;
   const CLIENT_ORIGIN = cfg.APP_ORIGIN || process.env.APP_ORIGIN || "http://localhost:5173";
-  const cookieName = cfg.JWT_COOKIE ?? "token";
 
   const redirectToLogin = (req: FastifyRequest, reply: FastifyReply) => {
     const clean = (req.raw.url ?? req.url).split("?")[0] || "/ads-debug";
@@ -33,33 +18,7 @@ const pagesRoutes: FastifyPluginAsync = async (app) => {
   };
 
   async function ensureAuth(req: FastifyRequest, reply: FastifyReply): Promise<boolean> {
-    const token = readDeepLinkToken(req);
-    if (token) {
-      try {
-        const decoded = app.jwt.verify<JwtUser>(token);
-        (req as FastifyRequest & { user?: JwtUser }).user = decoded;
-        return true;
-      } catch {
-        redirectToLogin(req, reply);
-        return false;
-      }
-    }
-
-    const auth = req.headers.authorization;
-    const hasBearer = typeof auth === "string" && /^bearer\s+/i.test(auth);
-    const hasCookie = Boolean(req.cookies?.[cookieName]);
-
-    try {
-      if (hasBearer) {
-        await req.jwtVerify();
-        return true;
-      }
-      if (hasCookie) {
-        await req.jwtVerify({ onlyCookie: true });
-        return true;
-      }
-    } catch {}
-
+    if (await app.verifyAccess(req)) return true;
     redirectToLogin(req, reply);
     return false;
   }

@@ -21,8 +21,9 @@
     "tw:embed": "tailwindcss -c tailwind.config.js -i ./src/ssr/embed.css -o ./public/assets/tw-embed.css --minify",
     "build": "tsc -p tsconfig.json && npm run tw:embed",
     "prepush:checks": "npm run lint && npm run prisma:generate && npm run build",
-    "test": "tsx --test tests/**/*.test.ts",
-    "test:watch": "tsx --test --watch tests/**/*.test.ts"
+    "test": "tsx --import ./tests/test-env.mjs --test --test-concurrency=1 --test-timeout=20000 tests/**/*.test.ts",
+    "test:watch": "tsx --import ./tests/test-env.mjs --test --test-concurrency=1 --watch tests/**/*.test.ts",
+    "test:db": "docker run -d --rm --name adtell-test-mongo -p 27019:27017 mongo:7 --replSet rs0 --bind_ip_all && sleep 3 && docker exec adtell-test-mongo mongosh --quiet --eval 'rs.initiate({_id:\"rs0\",members:[{_id:0,host:\"localhost:27017\"}]})'"
   },
   "dependencies": {
     "@clickhouse/client": "^1.12.1",
