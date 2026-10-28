@@ -1,5 +1,7 @@
 import fp from "fastify-plugin";
 
+const UPLOADS_CSP = "default-src 'none'; img-src 'self'; sandbox";
+
 export default fp(
   async (app) => {
     app.addHook("onSend", async (request, reply, _payload) => {
@@ -53,7 +55,12 @@ export default fp(
         "upgrade-insecure-requests",
       ].join("; ");
 
-      reply.header("Content-Security-Policy", isDocs ? docsCsp : defaultCsp);
+      // Uploaded creatives: even a mislabelled file can never run as a page on the API origin
+      const isUpload = request.routeOptions?.url === "/uploads/*";
+      reply.header(
+        "Content-Security-Policy",
+        isUpload ? UPLOADS_CSP : isDocs ? docsCsp : defaultCsp,
+      );
 
       if (FRAME_ANCESTORS === "'none'") {
         reply.header("X-Frame-Options", "DENY");

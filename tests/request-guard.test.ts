@@ -41,7 +41,7 @@ describe("request guard", () => {
   test("protected routes answer 401 without a session", async () => {
     for (const [method, url] of [
       ["GET", "/metrics"],
-      ["POST", "/api/upload"],
+      ["POST", "/api/ads/lineitems"],
       ["POST", "/api/adserver/line-items"],
       ["GET", "/api/auth/me"],
     ] as const) {
@@ -51,8 +51,8 @@ describe("request guard", () => {
     }
   });
 
-  test("the publisher ad script is public", async () => {
-    const res = await app.inject({ method: "GET", url: "/adslot.js" });
+  test("public static files are served without a session", async () => {
+    const res = await app.inject({ method: "GET", url: "/assets/tw-embed.css" });
     assert.equal(res.statusCode, 200);
   });
 
@@ -115,7 +115,7 @@ describe("request guard", () => {
   });
 
   test("the uid cookie is not set on other responses (e.g. long-cached static files)", async () => {
-    for (const url of ["/adslot.js", "/health"]) {
+    for (const url of ["/assets/tw-embed.css", "/health"]) {
       const res = await app.inject({ method: "GET", url });
       assert.ok(!res.cookies.some((c) => c.name === "uid"), url);
     }
