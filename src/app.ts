@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import AutoLoad from "@fastify/autoload";
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import configPlugin from "./config/index.js";
+import { isPublicAddress } from "./utils/safe-fetch.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -35,18 +36,32 @@ function makeLogger(usePretty: boolean) {
   } as const;
 }
 
+/**
+ * Render's load balancer reaches the app from its private network and appends the address it
+ * received the request from to X-Forwarded-For (for requests made through the site's Vercel
+ * rewrite, that is Vercel's address). Only private peers are trusted, and only for `hops` hops:
+ * `true` would trust every entry (clients pick their own IP and rate-limit key), and since
+ * Fastify 5.12 a plain hop count trusts nobody, which puts every visitor behind the proxy into
+ * one shared rate-limit bucket.
+ */
+function trustInternalProxies(hops: number) {
+  return (address: string, hop: number) => hop < hops && !isPublicAddress(address);
+}
+
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const isProd = process.env.NODE_ENV === "production";
   const usePretty = !isProd || process.env.PRETTY_LOGS === "1";
 
   const app = Fastify({
     ...options,
-    // Render puts exactly one proxy in front of the app. `true` would trust every
-    // X-Forwarded-For entry, so clients could pick their own IP (and rate-limit key).
-    trustProxy: Number(process.env.TRUST_PROXY_HOPS ?? DEFAULT_TRUST_PROXY_HOPS),
+    trustProxy: trustInternalProxies(
+      Number(process.env.TRUST_PROXY_HOPS ?? DEFAULT_TRUST_PROXY_HOPS),
+    ),
     logger: makeLogger(usePretty),
     disableRequestLogging: !isProd,
     pluginTimeout: 30000,
+    // Schemas use type unions such as ["string", "null"] (fields the browser may send as null)
+    ajv: { customOptions: { allowUnionTypes: true } },
   });
 
   await app.register(configPlugin);

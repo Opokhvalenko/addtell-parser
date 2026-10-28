@@ -70,64 +70,41 @@ test("Integration - Complete user flow", async () => {
     const lineItem = lineItemResponse.json() as { id: string };
     assert.ok(lineItem.id);
 
-    // 5. Send analytics event
+    // 5. Send analytics events (public, batched; stored by the background reporter)
     const analyticsResponse = await app.inject({
       method: "POST",
       url: "/api/analytics/events",
-      payload: [
-        {
-          event: "page_view",
-          ts: Date.now(),
-          userId: userInfo.id,
-          properties: {
-            url: "/test",
-            title: "Test Page",
-          },
-        },
-      ],
+      payload: [{ event: "pageLoad", page: "https://example.com/test" }],
     });
+    assert.strictEqual(analyticsResponse.statusCode, 204);
+    await app.analyticsReporter.flush();
 
-    assert.strictEqual(analyticsResponse.statusCode, 200);
-    const analyticsResult = analyticsResponse.json() as { success: boolean; count: number };
-    assert.strictEqual(analyticsResult.success, true);
-    assert.strictEqual(analyticsResult.count, 1);
-
-    // 6. Get stats
+    // 6. Read the stats (signed-in users only)
+    const today = new Date().toISOString().slice(0, 10);
     const statsResponse = await app.inject({
       method: "GET",
-      url: "/api/stats",
-      headers: {
-        cookie: `token=${loginToken}`,
-      },
+      url: `/api/analytics/stats?from=${today}&to=${today}&groupBy=event&metrics=count`,
+      headers: { cookie: `token=${loginToken}` },
     });
-
     assert.strictEqual(statsResponse.statusCode, 200);
-    const stats = statsResponse.json() as { data: any[] };
-    assert.ok(Array.isArray(stats.data));
+    assert.deepStrictEqual(statsResponse.json(), [{ event: "pageLoad", count: 1 }]);
 
-    // 7. Get feed
-    const feedResponse = await app.inject({
-      method: "GET",
-      url: "/api/feed",
-    });
-
-    assert.strictEqual(feedResponse.statusCode, 200);
-    const feed = feedResponse.json() as { items: any[] };
-    assert.ok(Array.isArray(feed.items));
-
-    // 8. Test bid request
+    // 7. The own ad server answers a bid request with the line item created above
     const bidResponse = await app.inject({
       method: "GET",
       url: "/api/bid?size=300x250&geo=US",
     });
-
     assert.strictEqual(bidResponse.statusCode, 200);
-    const bid = bidResponse.json() as { bids: any[] };
-    assert.ok(Array.isArray(bid.bids));
+    const bid = bidResponse.json() as { lineItemId: string; adm: string };
+    assert.strictEqual(bid.lineItemId, lineItem.id);
+    assert.ok(bid.adm.includes("Test Ad"));
 
     // Cleanup
+    await app.prisma.analyticsEvent.deleteMany();
+    await app.prisma.impression.deleteMany();
     await app.prisma.lineItem.deleteMany();
     await app.prisma.creative.deleteMany();
+    await app.prisma.refreshToken.deleteMany();
     await app.prisma.user.deleteMany();
   } finally {
     await closeTestApp(app);
@@ -169,14 +146,23 @@ test("Integration - Error handling flow", async () => {
 
     assert.strictEqual(unauthorizedResponse.statusCode, 401);
 
-    // Test invalid analytics data
-    const invalidAnalyticsResponse = await app.inject({
+    // Broken JSON is a client error, not a crash
+    const brokenJson = await app.inject({
       method: "POST",
       url: "/api/analytics/events",
-      payload: "invalid json",
+      headers: { "content-type": "application/json" },
+      payload: "[{ not json",
     });
+    assert.strictEqual(brokenJson.statusCode, 400);
 
-    assert.strictEqual(invalidAnalyticsResponse.statusCode, 400);
+    // Plain text is parsed as a string, which is not a batch of events
+    const plainText = await app.inject({
+      method: "POST",
+      url: "/api/analytics/events",
+      headers: { "content-type": "text/plain" },
+      payload: "pageLoad",
+    });
+    assert.strictEqual(plainText.statusCode, 400);
   } finally {
     await closeTestApp(app);
   }

@@ -15,7 +15,7 @@ export default fp(
       index: false,
       allowedPath: (pathName) => SERVED_EXTENSIONS.has(path.extname(pathName).toLowerCase()),
       // nosniff + a sandbox CSP for these files are set in security-headers.plugin.ts
-      setHeaders: (res) => res.setHeader("X-Content-Type-Options", "nosniff"),
+      setHeaders: (reply) => reply.header("X-Content-Type-Options", "nosniff"),
     });
     app.log.info({ root }, "static-uploads: enabled");
   },

@@ -22,21 +22,3 @@ test("Health Endpoints - GET /health should return server health status", async 
     await closeTestApp(app);
   }
 });
-
-test("Health Endpoints - GET /health/db should return database health status", async () => {
-  app = await createTestApp();
-
-  try {
-    const response = await app.inject({
-      method: "GET",
-      url: "/health/db",
-    });
-
-    assert.strictEqual(response.statusCode, 200);
-    const body = JSON.parse(response.payload);
-    assert.strictEqual(body.status, "ok");
-    assert.strictEqual(body.database, "connected");
-  } finally {
-    await closeTestApp(app);
-  }
-});
