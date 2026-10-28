@@ -1,9 +1,19 @@
+import { STATUS_CODES } from "node:http";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import type { FastifyError } from "fastify";
 import fp from "fastify-plugin";
 
 const BAD_REQUEST = 400;
 const CONFLICT = 409;
 const SERVER_ERROR = 500;
+
+/**
+ * Fastify passes anything that was thrown. Plugins also throw plain objects (the rate limiter
+ * throws `{ statusCode: 429, … }`), so any object is read for these fields; anything else is a 500.
+ */
+function asFastifyError(error: unknown): Partial<FastifyError> {
+  return typeof error === "object" && error !== null ? (error as Partial<FastifyError>) : {};
+}
 
 export default fp(
   async (app) => {
@@ -14,10 +24,11 @@ export default fp(
         return reply.code(CONFLICT).send({ error: "Conflict", statusCode: CONFLICT });
       }
 
-      const statusCode = error.validation
+      const err = asFastifyError(error);
+      const statusCode = err.validation
         ? BAD_REQUEST
-        : error.statusCode && error.statusCode >= BAD_REQUEST
-          ? error.statusCode
+        : err.statusCode && err.statusCode >= BAD_REQUEST
+          ? err.statusCode
           : SERVER_ERROR;
 
       if (statusCode >= SERVER_ERROR) {
@@ -29,8 +40,10 @@ export default fp(
         return reply.code(statusCode).send({ error: "Internal Server Error", statusCode });
       }
 
-      request.log.warn({ statusCode, url: request.url, msg: error.message }, "Client error");
-      return reply.code(statusCode).send({ error: error.message, statusCode });
+      request.log.warn({ statusCode, url: request.url, msg: err.message }, "Client error");
+      return reply
+        .code(statusCode)
+        .send({ error: err.message ?? STATUS_CODES[statusCode], statusCode });
     });
 
     app.setNotFoundHandler(async (request, reply) => {

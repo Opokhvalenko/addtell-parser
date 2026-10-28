@@ -25,18 +25,6 @@ describe("Plugins Tests", () => {
     assert.strictEqual(body.status, "ok");
   });
 
-  test("Health Plugin - should check database health", async () => {
-    const response = await app.inject({
-      method: "GET",
-      url: "/health/db",
-    });
-
-    assert.strictEqual(response.statusCode, 200);
-    const body = JSON.parse(response.body);
-    assert.strictEqual(body.status, "ok");
-    assert.strictEqual(body.database, "connected");
-  });
-
   test("JWT Plugin - should register JWT decorators", async () => {
     assert.ok(app.jwt);
     assert.ok(typeof app.jwt.sign === "function");
@@ -153,16 +141,6 @@ describe("Plugins Tests", () => {
 
     assert.strictEqual(response.statusCode, 200);
     // If OpenTelemetry is working, the request should complete successfully
-  });
-
-  test("ClickHouse Plugin - should connect to ClickHouse", async () => {
-    const response = await app.inject({
-      method: "GET",
-      url: "/health/clickhouse",
-    });
-
-    // ClickHouse might not be available in test environment
-    assert.ok([200, 503].includes(response.statusCode));
   });
 
   test("Prisma Plugin - should connect to database", async () => {

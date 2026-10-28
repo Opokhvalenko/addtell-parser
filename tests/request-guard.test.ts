@@ -7,6 +7,11 @@ import { closeTestApp, createTestApp } from "./setup.js";
 const FAST_RESPONSE_MS = 1000;
 /** Render appends the real client address as the last X-Forwarded-For entry. */
 const CLIENT_IP = "203.0.113.7";
+const OTHER_CLIENT_IP = "203.0.113.8";
+/** Render's load balancer reaches the app from its private network. */
+const RENDER_PROXY_IP = "10.204.1.17";
+/** A routable address: documentation ranges count as internal, like the proxy network. */
+const DIRECT_CLIENT_IP = "93.184.216.34";
 const TEST_AUTH_LIMIT = 3;
 
 let app: FastifyInstance;
@@ -95,6 +100,47 @@ describe("request guard", () => {
     assert.equal(last, 429);
   });
 
+  test("clients behind the proxy get separate limits; a direct client cannot pick its IP", async () => {
+    const previous = process.env.AUTH_RATE_LIMIT_MAX;
+    process.env.AUTH_RATE_LIMIT_MAX = String(TEST_AUTH_LIMIT);
+    const limited = await createTestApp();
+    process.env.AUTH_RATE_LIMIT_MAX = previous;
+    const login = (remoteAddress: string, forwardedFor: string) =>
+      limited.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        remoteAddress,
+        headers: { "x-forwarded-for": forwardedFor },
+        payload: { email: "nobody@example.com", password: "wrong-password-1" },
+      });
+    try {
+      // Through Render's proxy (a private address): the client is the last forwarded entry
+      for (let i = 0; i <= TEST_AUTH_LIMIT; i++) await login(RENDER_PROXY_IP, CLIENT_IP);
+      assert.equal(
+        (await login(RENDER_PROXY_IP, CLIENT_IP)).statusCode,
+        429,
+        "client behind proxy",
+      );
+      assert.notEqual(
+        (await login(RENDER_PROXY_IP, OTHER_CLIENT_IP)).statusCode,
+        429,
+        "another client behind proxy",
+      );
+
+      // A public peer is not a trusted proxy: its forwarded header is ignored
+      for (let i = 0; i <= TEST_AUTH_LIMIT; i++) {
+        await login(DIRECT_CLIENT_IP, `198.51.100.${i}`);
+      }
+      assert.equal(
+        (await login(DIRECT_CLIENT_IP, "198.51.100.200")).statusCode,
+        429,
+        "direct client",
+      );
+    } finally {
+      await closeTestApp(limited);
+    }
+  });
+
   test("server errors do not leak internal messages from any plugin's routes", async () => {
     // The real app, not a bare instance: a plugin registered before the error handler keeps
     // Fastify's default one, which sends `message` and `code` to the client
@@ -116,6 +162,17 @@ describe("request guard", () => {
       }
     } finally {
       for (const undo of restore) undo();
+    }
+  });
+
+  test("something thrown that is not an error object is still a generic 500", async () => {
+    const restore = stub(app.prisma.lineItem, "findMany", () => Promise.reject("raw string"));
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/bid?size=300x250&type=banner" });
+      assert.equal(res.statusCode, 500);
+      assert.deepEqual(res.json(), { error: "Internal Server Error", statusCode: 500 });
+    } finally {
+      restore();
     }
   });
 

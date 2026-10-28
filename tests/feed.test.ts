@@ -1,93 +1,50 @@
 import { strict as assert } from "node:assert";
-import { test } from "node:test";
+import { after, before, beforeEach, describe, test } from "node:test";
 import type { FastifyInstance } from "fastify";
 import { closeTestApp, createTestApp } from "./setup.js";
 
+// No network in these tests: a stored feed is served from the database. Fetching itself is
+// covered by tests/safe-fetch.test.ts against a local server.
 let app: FastifyInstance;
 
-test("Feed Module - GET /api/feed should return feeds with default URL", async () => {
-  app = await createTestApp();
+describe("Feed module", () => {
+  before(async () => {
+    app = await createTestApp();
+  });
+  after(async () => {
+    await closeTestApp(app);
+  });
+  beforeEach(async () => {
+    await app.prisma.feedItem.deleteMany();
+    await app.prisma.feed.deleteMany();
+  });
 
-  try {
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/feed",
+  test("GET /api/feed serves the stored default feed without fetching it again", async () => {
+    const url = app.config.DEFAULT_FEED_URL;
+    assert.ok(url);
+    const feed = await app.prisma.feed.create({ data: { url, title: "Stored feed" } });
+    await app.prisma.feedItem.create({
+      data: { feedId: feed.id, link: "https://example.com/a", title: "First story" },
     });
 
-    assert.strictEqual(response.statusCode, 200);
-    const body = JSON.parse(response.payload);
-    assert.ok(body.title);
-    assert.ok(body.url);
-    assert.ok(Array.isArray(body.items));
-  } finally {
-    await closeTestApp(app);
-  }
-});
+    const response = await app.inject({ method: "GET", url: "/api/feed" });
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { title: string; url: string; items: Array<{ title: string }> };
+    assert.equal(body.title, "Stored feed");
+    assert.equal(body.url, url);
+    assert.deepEqual(
+      body.items.map((i) => i.title),
+      ["First story"],
+    );
+  });
 
-test("Feed Module - GET /api/feed should return feeds with custom URL", async () => {
-  app = await createTestApp();
+  test("GET /api/feed rejects a malformed URL", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/feed?url=invalid-url" });
+    assert.equal(response.statusCode, 400);
+  });
 
-  try {
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/feed?url=https://hnrss.org/frontpage",
-    });
-
-    assert.strictEqual(response.statusCode, 200);
-    const body = JSON.parse(response.payload);
-    assert.ok(body.title);
-    assert.strictEqual(body.url, "https://hnrss.org/frontpage");
-    assert.ok(Array.isArray(body.items));
-  } finally {
-    await closeTestApp(app);
-  }
-});
-
-test("Feed Module - GET /api/feed should force refresh when force=1", async () => {
-  app = await createTestApp();
-
-  try {
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/feed?force=1",
-    });
-
-    assert.strictEqual(response.statusCode, 200);
-    const body = JSON.parse(response.payload);
-    assert.ok(body.title);
-    assert.ok(body.url);
-    assert.ok(Array.isArray(body.items));
-  } finally {
-    await closeTestApp(app);
-  }
-});
-
-test("Feed Module - GET /api/feed should validate URL format", async () => {
-  app = await createTestApp();
-
-  try {
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/feed?url=invalid-url",
-    });
-
-    assert.strictEqual(response.statusCode, 400);
-  } finally {
-    await closeTestApp(app);
-  }
-});
-
-test("Feed Module - GET /api/article/:id should return 404 for non-existent article", async () => {
-  app = await createTestApp();
-
-  try {
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/article/non-existent-id",
-    });
-
-    assert.strictEqual(response.statusCode, 404);
-  } finally {
-    await closeTestApp(app);
-  }
+  test("GET /api/article/:id answers 404 for an unknown article", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/article/non-existent-id" });
+    assert.equal(response.statusCode, 404);
+  });
 });

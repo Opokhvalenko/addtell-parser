@@ -64,13 +64,14 @@ test("AdServer Module - POST /api/ads/lineitems should require multipart data", 
       },
     });
 
-    const { token } = JSON.parse(registerResponse.payload);
+    // The session is only in the httpOnly cookie
+    const token = registerResponse.cookies.find((c) => c.name === "token")?.value;
 
     const response = await app.inject({
       method: "POST",
       url: "/api/ads/lineitems",
       headers: {
-        authorization: `Bearer ${token}`,
+        cookie: `token=${token}`,
         "content-type": "application/json",
       },
       payload: {
@@ -88,7 +89,7 @@ test("AdServer Module - POST /api/ads/lineitems should require multipart data", 
 
     assert.strictEqual(response.statusCode, 400);
     const body = JSON.parse(response.payload);
-    assert.ok(body.message.includes("multipart/form-data"));
+    assert.ok(body.error.includes("multipart/form-data"));
   } finally {
     await closeTestApp(app);
   }
