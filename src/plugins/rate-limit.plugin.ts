@@ -26,7 +26,6 @@ export default fp(async (app) => {
     timeWindow: cfg.RATE_LIMIT_WINDOW ?? DEFAULT_WINDOW,
     // No custom keyGenerator: the default key is `req.ip`, which honours only the trusted proxy
     // hops (`trustProxy` in app.ts). A raw X-Forwarded-For header is set by the client.
-    allowList: (req) => (req.raw.url ?? "").startsWith("/api/analytics"),
     errorResponseBuilder(_request, context) {
       return {
         statusCode: TOO_MANY_REQUESTS,

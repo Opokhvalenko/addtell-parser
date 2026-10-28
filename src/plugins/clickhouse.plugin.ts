@@ -21,11 +21,8 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string) {
 const plugin: FastifyPluginAsync = async (app) => {
   const cfg = app.config as Record<string, unknown>;
 
-  const enabled = String(cfg.CLICKHOUSE_ENABLE ?? "true").toLowerCase() !== "false";
-  if (!enabled) {
-    app.log.warn("[clickhouse] disabled via CLICKHOUSE_ENABLE=false");
-    return;
-  }
+  // Connect only when analytics actually go to ClickHouse
+  if (app.config.ANALYTICS_STORE !== "clickhouse") return;
 
   const url = String(cfg.CLICKHOUSE_URL ?? "");
   if (!url) {

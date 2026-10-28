@@ -1,236 +1,134 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { FastifyInstance } from "fastify";
-import type { BaseEvent, StatRow, StatsQuery } from "./types.js";
+import { type IncomingEvent, MAX_STATS_RANGE_DAYS, type StatsQueryString } from "./schemas.js";
+import {
+  type AnalyticsRow,
+  type AnalyticsStore,
+  GROUP_KEYS,
+  type GroupKey,
+  METRIC_KEYS,
+  type MetricKey,
+  type StatsRequest,
+} from "./store.js";
 
-function toCHDateTime(input?: number | string | Date): string {
-  const d =
-    typeof input === "number"
-      ? new Date(input)
-      : input instanceof Date
-        ? input
-        : input
-          ? new Date(input)
-          : new Date();
-  const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+const DAY_MS = 86_400_000;
+const DEFAULT_STATS_LIMIT = 100;
+/** Upper bound of events waiting in memory; beyond it new events are dropped, not queued. */
+export const MAX_BUFFERED_EVENTS = 5000;
+
+export class InvalidStatsQueryError extends Error {}
+
+/** Server time, not the client's: a client timestamp could be anything (and broke inserts). */
+export function toRow(e: IncomingEvent, now = new Date()): AnalyticsRow {
+  return {
+    ts: now,
+    event: e.event,
+    adapter: e.adapter ?? "",
+    adUnitCode: e.adUnitCode ?? "",
+    bidder: e.bidder ?? "",
+    creativeId: e.creativeId == null ? "" : String(e.creativeId),
+    cpm: e.cpm ?? 0,
+    cur: e.cur ?? "USD",
+    uid: e.uid ?? "",
+    sid: e.sid ?? "",
+    page: e.page ?? "",
+    ref: e.ref ?? "",
+    adomain: e.adomain ?? [],
+  };
 }
 
-function toYMD(input: string | Date): string {
-  const d = typeof input === "string" ? new Date(`${input}T00:00:00Z`) : input;
-  const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
-}
+/**
+ * Batches events in memory and writes them in the background. The buffer is bounded and a
+ * failed write is logged and dropped, never put back: with a store that is down, re-queueing
+ * made memory grow with every visitor until the process restarted.
+ */
+export function createReporter(
+  app: FastifyInstance,
+  store: AnalyticsStore,
+  opts: { batchSize: number; flushMs: number; maxBuffered?: number },
+) {
+  const maxBuffered = opts.maxBuffered ?? MAX_BUFFERED_EVENTS;
+  let buf: AnalyticsRow[] = [];
+  let timer: NodeJS.Timeout | null = null;
+  let flushing: Promise<void> | null = null;
+  let dropped = 0;
 
-function chId(name: string) {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-    throw new Error(`Unsafe ClickHouse identifier: ${name}`);
+  async function write(rows: AnalyticsRow[]) {
+    try {
+      await store.insert(rows);
+      app.metrics?.ingestCounter.inc({ source: store.name }, rows.length);
+    } catch (err) {
+      app.log.error({ err, n: rows.length, store: store.name }, "analytics insert failed, dropped");
+    }
   }
-  return `\`${name}\``;
+
+  async function flush(): Promise<void> {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    // A loop, not one await: several callers may wait on the same write, and each must also
+    // wait for the write started by the one that resumed first
+    while (flushing) await flushing;
+    if (buf.length === 0) return;
+    const rows = buf;
+    buf = [];
+    if (dropped > 0) {
+      app.log.warn({ dropped }, "analytics buffer full, events dropped");
+      dropped = 0;
+    }
+    flushing = write(rows);
+    await flushing;
+    flushing = null;
+  }
+
+  function enqueue(rows: AnalyticsRow[]) {
+    const room = Math.max(0, maxBuffered - buf.length);
+    if (rows.length > room) dropped += rows.length - room;
+    buf.push(...rows.slice(0, room));
+    if (buf.length >= opts.batchSize) void flush();
+    else if (!timer && buf.length > 0) {
+      timer = setTimeout(() => void flush(), opts.flushMs);
+      timer.unref();
+    }
+  }
+
+  return { enqueue, flush, buffered: () => buf.length };
 }
 
-function asStringArray(v: string | string[] | undefined, defCSV = ""): string[] {
-  if (Array.isArray(v)) {
-    return v.filter((s): s is string => typeof s === "string" && s.length > 0);
-  }
-  return (v ?? defCSV)
+const csv = (value: string | undefined) =>
+  (value ?? "")
     .split(",")
     .map((s) => s.trim())
-    .filter((s): s is string => s.length > 0);
-}
+    .filter(Boolean);
 
-function extractAlias(expr: string): string {
-  const parts = expr.split(/\s+AS\s+/i);
-  const alias = parts[1];
-  return alias ?? expr;
-}
-
-function buildOrderBy(orderBy: string | undefined, allowed: Set<string>, fallback: string) {
-  if (!orderBy) return fallback;
-  const cleaned = orderBy
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => {
-      const [fieldRaw, dirRaw] = p.split(/\s+/);
-      const field = fieldRaw?.trim();
-      if (!field || !allowed.has(field)) return "";
-      const up = (dirRaw ?? "").toUpperCase();
-      const dir = up === "ASC" || up === "DESC" ? up : "ASC";
-      return `${field} ${dir}`;
-    })
-    .filter((s) => s.length > 0)
-    .join(", ");
-  return cleaned || fallback;
-}
-
-const GROUPS = {
-  day: "toDate(ts) AS day",
-  hour: "toHour(ts) AS hour",
-  event: "event",
-  adapter: "adapter",
-  adUnit: "adUnitCode",
-  bidder: "bidder",
-  creativeId: "creativeId",
-} as const satisfies Record<string, string>;
-
-const METRICS = {
-  count: "count() AS count",
-  requests: "countIf(event = 'bidRequested') AS requests",
-  responses: "countIf(event = 'bidResponse') AS responses",
-  wins: "countIf(event IN ('bidWon','win')) AS wins",
-  cpmAvg: "avgIf(cpm, event IN ('bidWon','win')) AS cpmAvg",
-  cpmP95: "quantileIf(0.95)(cpm, event IN ('bidWon','win')) AS cpmP95",
-  revenue: "sumIf(cpm, event IN ('bidWon','win')) / 1000 AS revenue",
-} as const satisfies Record<string, string>;
-
-type GroupKey = keyof typeof GROUPS;
-type MetricKey = keyof typeof METRICS;
-
-function isGroupKey(s: string): s is GroupKey {
-  return s in GROUPS;
-}
-function isMetricKey(s: string): s is MetricKey {
-  return s in METRICS;
-}
-
-export function createReporter(app: FastifyInstance) {
-  const DB = app.config.CLICKHOUSE_DB || "adtell";
-  const TABLE = app.config.CLICKHOUSE_TABLE || "events";
-  const BATCH = Number(app.config.CH_BATCH_SIZE ?? 100);
-  const FLUSH_MS = Number(app.config.CH_FLUSH_MS ?? 1000);
-
-  let buf: BaseEvent[] = [];
-  let timer: NodeJS.Timeout | null = null;
-  let flushing = false;
-
-  function startTimer() {
-    if (!timer) {
-      timer = setTimeout(async () => {
-        timer = null;
-        await flush();
-      }, FLUSH_MS);
-    }
+/** Validates real calendar dates, `from <= to` and the maximum range. */
+export function parseStatsQuery(q: StatsQueryString): StatsRequest {
+  const from = new Date(`${q.from}T00:00:00Z`);
+  const to = new Date(`${q.to}T00:00:00Z`);
+  // V8 rolls impossible days over (`2026-04-31` becomes 1 May): compare back to the input
+  const isReal = (d: Date, raw: string) =>
+    !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === raw;
+  if (!isReal(from, q.from) || !isReal(to, q.to)) {
+    throw new InvalidStatsQueryError("from and to must be real dates (YYYY-MM-DD)");
+  }
+  if (from > to) throw new InvalidStatsQueryError("from must not be after to");
+  const days = (to.getTime() - from.getTime()) / DAY_MS + 1;
+  if (days > MAX_STATS_RANGE_DAYS) {
+    throw new InvalidStatsQueryError(`The range must not exceed ${MAX_STATS_RANGE_DAYS} days`);
   }
 
-  async function flush() {
-    if (flushing || buf.length === 0) return;
+  const groupBy = csv(q.groupBy ?? "day").filter((g): g is GroupKey =>
+    (GROUP_KEYS as readonly string[]).includes(g),
+  );
+  const metrics = csv(q.metrics ?? "count").filter((m): m is MetricKey =>
+    (METRIC_KEYS as readonly string[]).includes(m),
+  );
 
-    const ch = app.clickhouse as ClickHouseClient | undefined;
-    const payload = buf;
-    buf = [];
-    flushing = true;
-
-    try {
-      if (!ch) {
-        app.log.debug({ n: payload.length }, "skip flush: no ClickHouse client");
-        return;
-      }
-      await ch.insert({
-        table: `${DB}.${TABLE}`,
-        values: payload.map((e) => ({
-          ts: toCHDateTime(e.ts ?? new Date()),
-          event: e.event,
-          adapter: e.adapter ?? "",
-          adUnitCode: e.adUnitCode ?? "",
-          bidder: e.bidder ?? "",
-          creativeId: String(e.creativeId ?? ""),
-          cpm: typeof e.cpm === "number" ? e.cpm : 0,
-          cur: e.cur ?? "USD",
-          uid: e.uid ?? "",
-          sid: e.sid ?? "",
-          page: e.page ?? "",
-          ref: e.ref ?? "",
-          adomain: Array.isArray(e.adomain) ? e.adomain : [],
-        })),
-        format: "JSONEachRow",
-      });
-      app.metrics?.ingestCounter?.inc({ source: "api" }, payload.length);
-    } catch (err) {
-      app.log.error({ err }, "clickhouse insert failed, re-queue");
-      buf = [...payload, ...buf];
-    } finally {
-      flushing = false;
-    }
-  }
-
-  async function enqueue(ev: BaseEvent | BaseEvent[]) {
-    const list = Array.isArray(ev) ? ev : [ev];
-    buf.push(...list.filter(Boolean).map((e) => ({ ...e, ts: e.ts ?? new Date() })));
-    if (buf.length >= BATCH) await flush();
-    else startTimer();
-  }
-
-  const onExit = async () => {
-    try {
-      await flush();
-    } catch {}
+  return {
+    from,
+    toExclusive: new Date(to.getTime() + DAY_MS),
+    groupBy: groupBy.length ? [...new Set(groupBy)] : ["day"],
+    metrics: metrics.length ? [...new Set(metrics)] : ["count"],
+    limit: q.limit ?? DEFAULT_STATS_LIMIT,
   };
-  process.on("SIGINT", onExit);
-  process.on("SIGTERM", onExit);
-
-  return { enqueue, flushNow: flush };
-}
-
-export async function getStats(app: FastifyInstance, q: StatsQuery) {
-  const client = app.clickhouse as ClickHouseClient | undefined;
-  if (!client) return [] as StatRow[];
-
-  const fromStr = typeof q.from === "string" ? q.from : toYMD(q.from);
-  const toStr = typeof q.to === "string" ? q.to : toYMD(q.to);
-
-  const fromDT = toCHDateTime(new Date(`${fromStr}T00:00:00Z`));
-  const toExclusiveDT = toCHDateTime(
-    new Date(new Date(`${toStr}T00:00:00Z`).getTime() + 86400_000),
-  );
-
-  const groupKeys = asStringArray(q.groupBy, "day,event,adapter").filter(isGroupKey);
-  const groupExprs = groupKeys.map((g) => GROUPS[g]);
-  const groupAliases = groupExprs.map(extractAlias);
-
-  if (groupExprs.length === 0) {
-    groupExprs.push(GROUPS.day);
-    groupAliases.push("day");
-  }
-
-  const metricKeys = asStringArray(q.metrics, "count,wins,cpmAvg").filter(isMetricKey);
-  let metricExprs = metricKeys.map((m) => METRICS[m]);
-
-  if (metricExprs.length === 0) {
-    metricExprs = [METRICS.count];
-  }
-
-  const allowedOrder = new Set<string>([...groupAliases, ...metricExprs.map(extractAlias)]);
-
-  const defaultMetricAlias = extractAlias(metricExprs[0] ?? METRICS.count);
-
-  const orderExpr = buildOrderBy(
-    q.orderBy,
-    allowedOrder,
-    `${groupAliases.join(", ")}${groupAliases.length ? ", " : ""}${defaultMetricAlias} DESC`,
-  );
-
-  const limit = Math.min(Math.max(Number(q.limit ?? 100), 1), 1000);
-  const offset = Math.max(Number(q.offset ?? 0), 0);
-
-  const DB = chId(app.config.CLICKHOUSE_DB || "adtell");
-  const TABLE = chId(app.config.CLICKHOUSE_TABLE || "events");
-
-  const sql = `
-    SELECT
-      ${groupExprs.join(", ")},
-      ${metricExprs.join(", ")}
-    FROM ${DB}.${TABLE}
-    WHERE ts >= {from:DateTime} AND ts < {to:DateTime}
-    ${groupAliases.length ? `GROUP BY ${groupAliases.join(", ")}` : ""}
-    ORDER BY ${orderExpr}
-    LIMIT {offset:UInt32}, {limit:UInt32}
-  `;
-
-  const res = await client.query({
-    query: sql,
-    format: "JSONEachRow",
-    query_params: { from: fromDT, to: toExclusiveDT, offset, limit },
-  });
-
-  return (await res.json()) as StatRow[];
 }

@@ -1,120 +1,88 @@
 import type { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
-import { createReporter, getStats } from "./service.js";
-import type { BaseEvent } from "./types.js";
+import { ensureTtlIndex } from "../../utils/mongo-ttl.js";
+import {
+  EVENTS_BODY_LIMIT_BYTES,
+  EventsBodySchema,
+  type IncomingEvent,
+  StatsQuerySchema,
+  type StatsQueryString,
+} from "./schemas.js";
+import { createReporter, InvalidStatsQueryError, parseStatsQuery, toRow } from "./service.js";
+import { type AnalyticsStore, clickhouseStore, mongoStore } from "./store.js";
 
-function normalizeBody(body: unknown): BaseEvent[] {
-  const parse = (v: unknown) => {
-    if (typeof v === "string") {
-      try {
-        return JSON.parse(v);
-      } catch {
-        return undefined;
-      }
-    }
-    return v;
-  };
-  const v = parse(body);
-  if (Array.isArray(v)) return v as BaseEvent[];
-  if (v && typeof v === "object") return [v as BaseEvent];
-  return [];
+const DAY_SECONDS = 86_400;
+/** Per client IP; one request carries up to 100 events, the frontend flushes every ~1.5 s. */
+const EVENTS_RATE_LIMIT = { max: 120, timeWindow: "1 minute" };
+
+function pickStore(app: FastifyInstance): AnalyticsStore {
+  if (app.config.ANALYTICS_STORE === "clickhouse") {
+    if (app.clickhouse) return clickhouseStore(app, app.clickhouse);
+    app.log.warn("ANALYTICS_STORE=clickhouse but no ClickHouse client, using MongoDB");
+  }
+  return mongoStore(app);
 }
-
-const statsQuerySchema = {
-  type: "object",
-  properties: {
-    from: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
-    to: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
-    groupBy: { type: "string" }, // "day,event,adapter"
-    metrics: { type: "string" }, // "count,wins,cpmAvg"
-  },
-  required: ["from", "to"],
-  additionalProperties: false,
-} as const;
-
-type GroupKey = "day" | "event" | "adapter";
-type MetricKey = "count" | "wins" | "cpmAvg";
-
-const isGroupBy = (v: string): v is GroupKey =>
-  (["day", "event", "adapter"] as const).includes(v as GroupKey);
-
-const isMetric = (v: string): v is MetricKey =>
-  (["count", "wins", "cpmAvg"] as const).includes(v as MetricKey);
 
 export default fp(
   async function analyticsRoutes(app: FastifyInstance) {
-    if (app.analyticsRoutesRegistered) {
-      app.log.warn("analytics routes already registered – skipping");
-      return;
+    const store = pickStore(app);
+    const reporter = createReporter(app, store, {
+      batchSize: app.config.ANALYTICS_BATCH_SIZE,
+      flushMs: app.config.ANALYTICS_FLUSH_MS,
+    });
+    app.addHook("onClose", async () => reporter.flush());
+
+    if (store.name === "mongo") {
+      app.addHook("onReady", async () => {
+        try {
+          await ensureTtlIndex(
+            app,
+            "AnalyticsEvent",
+            "ts",
+            app.config.ANALYTICS_RETENTION_DAYS * DAY_SECONDS,
+          );
+        } catch (err) {
+          app.log.error({ err }, "analytics: could not ensure the TTL index");
+        }
+      });
     }
-    app.analyticsRoutesRegistered = true;
+    app.log.info({ store: store.name }, "analytics store");
 
-    const reporter = createReporter(app);
+    app.get("/api/analytics/health", { config: { public: true, rateLimit: false } }, async () => ({
+      status: "ok",
+    }));
 
-    app.register(
-      async (r) => {
-        r.get(
-          "/health",
-          { config: { public: true, rateLimit: false }, logLevel: "info" },
-          async (_req, reply) => reply.send({ status: "ok", timestamp: new Date().toISOString() }),
-        );
-
-        r.get(
-          "/stats",
-          { config: { public: true }, schema: { querystring: statsQuerySchema }, logLevel: "info" },
-          async (req) => {
-            const q = req.query as { from: string; to: string; groupBy?: string; metrics?: string };
-            const groupBy = (q.groupBy ?? "day")
-              .split(",")
-              .map((s) => s.trim())
-              .filter(isGroupBy);
-            const metrics = (q.metrics ?? "count")
-              .split(",")
-              .map((s) => s.trim())
-              .filter(isMetric);
-
-            const data = await getStats(app, {
-              from: new Date(q.from),
-              to: new Date(q.to),
-              groupBy,
-              metrics,
-            });
-            return data;
-          },
-        );
-
-        r.post(
-          "/events",
-          {
-            config: { public: true, rateLimit: false },
-            logLevel: "info",
-            bodyLimit: 10 * 1024 * 1024,
-          },
-          async (req, reply) => {
-            const events = normalizeBody(req.body);
-            if (!events.length) return reply.code(400).send({ error: "No valid events provided" });
-            await reporter.enqueue(events);
-            return reply.code(204).send();
-          },
-        );
-
-        r.post(
-          "/report",
-          {
-            config: { public: true, rateLimit: false },
-            logLevel: "info",
-            bodyLimit: 10 * 1024 * 1024,
-          },
-          async (req, reply) => {
-            const events = normalizeBody(req.body);
-            if (!events.length) return reply.code(400).send({ error: "No valid events provided" });
-            await reporter.enqueue(events);
-            return reply.code(204).send();
-          },
-        );
+    // Signed-in users only: aggregated over the whole site
+    app.get<{ Querystring: StatsQueryString }>(
+      "/api/analytics/stats",
+      { schema: { querystring: StatsQuerySchema } },
+      async (req) => {
+        try {
+          return await store.stats(parseStatsQuery(req.query));
+        } catch (error) {
+          if (error instanceof InvalidStatsQueryError)
+            throw app.httpErrors.badRequest(error.message);
+          throw error;
+        }
       },
-      { prefix: "/api/analytics" },
     );
+
+    // Public: called by publisher pages (Prebid events, sendBeacon on unload)
+    app.post<{ Body: IncomingEvent[] }>(
+      "/api/analytics/events",
+      {
+        config: { public: true, rateLimit: EVENTS_RATE_LIMIT },
+        bodyLimit: EVENTS_BODY_LIMIT_BYTES,
+        schema: { body: EventsBodySchema },
+      },
+      async (req, reply) => {
+        const now = new Date();
+        reporter.enqueue(req.body.map((e) => toRow(e, now)));
+        return reply.code(204).send();
+      },
+    );
+
+    app.decorate("analyticsReporter", reporter);
   },
   { name: "analytics-routes" },
 );

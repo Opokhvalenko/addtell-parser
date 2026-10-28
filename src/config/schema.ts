@@ -33,7 +33,12 @@ export const EnvSchema = {
       default: "info",
     },
 
-    CLICKHOUSE_ENABLE: { type: "string", default: "true" },
+    /** Where ad analytics events go; ClickHouse needs the CLICKHOUSE_* settings below. */
+    ANALYTICS_STORE: { type: "string", enum: ["mongo", "clickhouse"], default: "mongo" },
+    ANALYTICS_RETENTION_DAYS: { type: "integer", minimum: 1, maximum: 365, default: 30 },
+    ANALYTICS_BATCH_SIZE: { type: "integer", minimum: 1, maximum: 1000, default: 100 },
+    ANALYTICS_FLUSH_MS: { type: "integer", minimum: 100, default: 1000 },
+
     CLICKHOUSE_SKIP_DDL: { type: "string", default: "true" },
     CLICKHOUSE_URL: { type: "string", default: "http://127.0.0.1:8123" },
     CLICKHOUSE_DB: { type: "string", default: "mydb" },
@@ -42,9 +47,6 @@ export const EnvSchema = {
     CLICKHOUSE_TABLE: { type: "string", default: "events" },
     CLICKHOUSE_CONNECT_TIMEOUT_MS: { type: "integer", default: 3000 },
     CLICKHOUSE_PING_TIMEOUT_MS: { type: "integer", default: 2000 },
-
-    CH_BATCH_SIZE: { type: "integer", default: 1000 },
-    CH_FLUSH_MS: { type: "integer", default: 5000 },
 
     CRON_ENABLE: { type: "string", default: "true" },
     FEEDS_OUT: { type: "string", default: "public/ads/feeds.json" },

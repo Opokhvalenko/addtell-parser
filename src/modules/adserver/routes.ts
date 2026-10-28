@@ -3,7 +3,6 @@ import type { Static } from "@sinclair/typebox";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { resolveCreative } from "./creative.js";
 import { impressionRepo } from "./repo/impressionRepo.js";
-import { metricsRepo } from "./repo/metricsRepo.js";
 import { LineItemBody } from "./schemas.js";
 import { type CreateArgs, createLineItem } from "./service/create.js";
 import { pickLineItem } from "./service/pick.js";
@@ -24,13 +23,13 @@ const BidQuerySchema = {
     size: { type: "string", pattern: "^[0-9]+x[0-9]+$" },
     geo: { type: "string", minLength: 2, maxLength: 8 },
     type: { type: "string" },
-    uid: { type: "string" },
     floorCpm: { type: "number", minimum: 0 },
   },
   additionalProperties: false,
 } as const;
 
 type ReqWithUid = FastifyRequest & { uid?: string };
+const ANONYMOUS_UID = "anon";
 type LineItemBodyType = Static<typeof LineItemBody>;
 
 const AD_TYPES = ["banner", "video", "native"] as const;
@@ -62,91 +61,33 @@ const routes: FastifyPluginAsync = async (app) => {
       config: { public: true, rateLimit: { max: 120 } },
     },
     async (req, reply) => {
-      const startedAt = Date.now();
       const q = req.query as Partial<BidQuery>;
+      // Only the server-signed cookie: an id from the query would let a client spend
+      // (or reset) someone else's frequency cap
+      const uid = (req as ReqWithUid).uid ?? ANONYMOUS_UID;
 
-      const uid = getUserId(req as ReqWithUid, q.uid);
-      const size = getSizeKey(q.size);
-      const type = parseAdType(q.type);
-      const geo = getGeo(q.geo);
-      const floor = getFloor(q.floorCpm);
+      const lineItem = await pickLineItem(app, {
+        size: getSizeKey(q.size),
+        geo: getGeo(q.geo),
+        type: parseAdType(q.type),
+        uid,
+        floorCpm: getFloor(q.floorCpm),
+      });
+      if (!lineItem) return reply.code(204).send();
 
-      const m = metricsRepo(app);
+      await impressionRepo(app).add(uid, lineItem.id);
 
-      try {
-        await m.add("bid_request", {
-          uid,
-          tookMs: null,
-          extra: { size, type, geo: geo ?? null, floor: floor ?? null },
-        });
-        await m.incr(`adserver:bid:${new Date().toISOString().slice(0, 10)}`, 1);
-      } catch (err) {
-        app.log.warn({ err }, "[adserver] metrics: failed to write bid_request");
-      }
-
-      try {
-        const lineItem = await pickLineItem(app, {
-          size,
-          geo,
-          type,
-          uid,
-          floorCpm: floor,
-        });
-
-        if (!lineItem) {
-          try {
-            await m.add("bid_empty", { uid, tookMs: Date.now() - startedAt });
-          } catch (err) {
-            app.log.warn({ err }, "[adserver] metrics: failed to write bid_empty");
-          }
-          return reply.code(204).send();
-        }
-
-        try {
-          await impressionRepo(app).add(uid, lineItem.id);
-        } catch (err) {
-          app.log.warn({ err }, "[adserver] impressionRepo.add failed");
-        }
-
-        const { w, h } = getCreativeSize(lineItem);
-        const adm = getAdMarkup(lineItem, w, h);
-
-        try {
-          await m.add("bid_filled", {
-            uid,
-            lineItemId: lineItem.id,
-            tookMs: Date.now() - startedAt,
-            extra: { w, h },
-          });
-        } catch (err) {
-          app.log.warn({ err }, "[adserver] metrics: failed to write bid_filled");
-        }
-
-        return {
-          lineItemId: lineItem.id,
-          cpm: resolveCpm(lineItem),
-          w,
-          h,
-          adm,
-          adomain: [],
-          ttl: 300,
-          cur: "USD",
-        };
-      } catch (err: unknown) {
-        try {
-          await m.add("bid_error", {
-            uid,
-            tookMs: Date.now() - startedAt,
-            extra: { message: (err as Error)?.message ?? "unknown" },
-          });
-        } catch (e) {
-          app.log.warn({ err: e }, "[adserver] metrics: failed to write bid_error");
-        }
-        app.log.error({ err }, "[adserver] /bid failed");
-        throw app.httpErrors.internalServerError(
-          (err as Error)?.message ?? "bid processing failed",
-        );
-      }
+      const { w, h } = getCreativeSize(lineItem);
+      return {
+        lineItemId: lineItem.id,
+        cpm: resolveCpm(lineItem),
+        w,
+        h,
+        adm: getAdMarkup(lineItem, w, h),
+        adomain: [],
+        ttl: 300,
+        cur: "USD",
+      };
     },
   );
 
@@ -242,12 +183,6 @@ const routes: FastifyPluginAsync = async (app) => {
 function firstSize(sizes: string[]): { w: number; h: number } {
   const [w = 0, h = 0] = (sizes[0] ?? "").split("x").map(Number);
   return { w, h };
-}
-
-function getUserId(req: ReqWithUid, queryUid: unknown): string {
-  if (req.uid) return req.uid;
-  if (queryUid !== undefined && queryUid !== null) return String(queryUid);
-  return "anon";
 }
 
 function getGeo(queryGeo: unknown): string | undefined {

@@ -10,7 +10,6 @@ const TEST_DEFAULTS = {
   JWT_SECRET: "test-jwt-secret-that-is-at-least-32-chars",
   COOKIE_SECRET: "test-cookie-secret-that-is-at-least-32-chars",
   APP_ORIGIN: "http://localhost:5173",
-  CLICKHOUSE_ENABLE: "false",
   CRON_ENABLE: "false",
   LOG_LEVEL: "silent",
   OTEL_SDK_DISABLED: "true",

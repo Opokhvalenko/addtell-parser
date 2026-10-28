@@ -9,7 +9,7 @@ Backend service for a news platform with programmatic ad serving, real-time anal
 ## Tech Stack
 
 **Runtime:** Fastify v5, TypeScript, Node.js 20
-**Database:** MongoDB + Prisma ORM, ClickHouse (analytics)
+**Database:** MongoDB + Prisma ORM; analytics in MongoDB (TTL) or ClickHouse (`ANALYTICS_STORE=clickhouse`)
 **Auth:** Argon2, JWT, HttpOnly signed cookies
 **Observability:** OpenTelemetry (traces, metrics, logs), Pino
 **Ads:** Custom ad server with bid auction, frequency capping, SSR creatives
@@ -20,7 +20,7 @@ Backend service for a news platform with programmatic ad serving, real-time anal
 - **RSS Feed Aggregation** — cron-based feed sync, article extraction with HTML sanitization (DOMPurify)
 - **Ad Server** — line item management, bid endpoint with filtering pipeline (size, geo, floor CPM, frequency cap)
 - **Header Bidding Support** — bid/win endpoints for Prebid.js integration
-- **Analytics Pipeline** — event ingestion → ClickHouse storage → aggregated stats with CSV export
+- **Analytics Pipeline** — validated, rate-limited event ingestion → bounded in-memory batching → MongoDB (30-day TTL) or ClickHouse → aggregated stats for signed-in users
 - **Auth System** — Argon2 password hashing, JWT in HttpOnly signed cookies, role-based route guards
 - **OpenTelemetry** — distributed tracing, HTTP/DB metrics, structured logging with correlation IDs
 - **Security** — CSP, HSTS, X-Frame-Options, rate limiting, input validation (Zod)
@@ -99,9 +99,8 @@ See `.env.example` for all available options.
 - `GET /api/beautiful-ad` — house ad endpoint
 
 ### Analytics
-- `POST /api/stats/ingest` — track events (→ ClickHouse)
-- `GET /api/stats` — aggregated statistics
-- `GET /api/stats/export` — CSV export
+- `POST /api/analytics/events` — public: a batch of up to 100 events (schema-validated, rate-limited per IP)
+- `GET /api/analytics/stats?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day,event,adapter&metrics=count,wins,cpmAvg` — requires a session, range ≤ 90 days
 
 ### Uploads
 - `POST /api/upload` — upload creative (requires auth)

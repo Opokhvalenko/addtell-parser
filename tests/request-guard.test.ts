@@ -1,8 +1,6 @@
 import { strict as assert } from "node:assert";
 import { after, before, describe, test } from "node:test";
-import sensible from "@fastify/sensible";
-import Fastify, { type FastifyInstance } from "fastify";
-import errorHandling from "../src/plugins/error-handling.plugin.js";
+import type { FastifyInstance } from "fastify";
 import { closeTestApp, createTestApp } from "./setup.js";
 
 /** A request that hangs is the bug this guards against; anything slower than this is a failure. */
@@ -12,6 +10,15 @@ const CLIENT_IP = "203.0.113.7";
 const TEST_AUTH_LIMIT = 3;
 
 let app: FastifyInstance;
+
+/** Replaces one method for the duration of a test; returns the undo. */
+function stub<T extends object, K extends keyof T>(target: T, key: K, impl: T[K]) {
+  const original = target[key];
+  target[key] = impl;
+  return () => {
+    target[key] = original;
+  };
+}
 
 async function timed(url: string, method: "GET" | "POST" = "GET") {
   const startedAt = Date.now();
@@ -88,17 +95,34 @@ describe("request guard", () => {
     assert.equal(last, 429);
   });
 
-  test("server errors do not leak internal messages", async () => {
-    const probe = Fastify({ logger: false });
-    await probe.register(sensible);
-    await probe.register(errorHandling);
-    probe.get("/boom", async () => {
-      throw new Error("connect ECONNREFUSED clickhouse.internal:8123");
-    });
-    const res = await probe.inject({ method: "GET", url: "/boom" });
-    await probe.close();
-    assert.equal(res.statusCode, 500);
-    assert.deepEqual(res.json(), { error: "Internal Server Error", statusCode: 500 });
+  test("server errors do not leak internal messages from any plugin's routes", async () => {
+    // The real app, not a bare instance: a plugin registered before the error handler keeps
+    // Fastify's default one, which sends `message` and `code` to the client
+    const secret = "getaddrinfo ENOTFOUND db.internal.example";
+    const fail = () => Promise.reject(new Error(secret));
+    // Prisma delegates are proxies, which node:test's mock.method cannot wrap
+    const restore = [
+      stub(app.prisma.user, "findFirst", fail),
+      stub(app.prisma.lineItem, "findMany", fail),
+    ];
+    try {
+      for (const [method, url, payload] of [
+        ["POST", "/api/auth/login", { email: "a@example.com", password: "password-123" }],
+        ["GET", "/api/bid?size=300x250&type=banner", undefined],
+      ] as const) {
+        const res = await app.inject({ method, url, ...(payload ? { payload } : {}) });
+        assert.equal(res.statusCode, 500, url);
+        assert.deepEqual(res.json(), { error: "Internal Server Error", statusCode: 500 }, url);
+      }
+    } finally {
+      for (const undo of restore) undo();
+    }
+  });
+
+  test("/health is ok with the default MongoDB analytics store (ClickHouse is not a dependency)", async () => {
+    const res = await app.inject({ method: "GET", url: "/health" });
+    assert.equal(res.statusCode, 200);
+    assert.equal((res.json() as { status: string }).status, "ok");
   });
 
   test("/health reports only up/down, never error texts", async () => {

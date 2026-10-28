@@ -52,6 +52,8 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:?set-in-.env}
       DATABASE_URL: ${DATABASE_URL:?set-in-.env}
 
+      # The compose stack runs its own ClickHouse; without this, analytics go to MongoDB
+      ANALYTICS_STORE: clickhouse
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:?set-in-.env}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:?set-in-.env}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:?set-in-.env}
