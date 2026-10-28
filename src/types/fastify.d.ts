@@ -4,12 +4,13 @@ import type { CronStatus } from "../cron/types";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Registry, Counter } from "prom-client";
 import type { Config } from "../config/schema";
+import type { createReporter } from "../modules/analytics/service";
 
 declare module "fastify" {
   interface FastifyInstance {
     config: Config;
     clickhouse?: ClickHouseClient;
-    analyticsRoutesRegistered?: boolean;
+    analyticsReporter: ReturnType<typeof createReporter>;
     metrics?: {
       register: Registry;
       ingestCounter: Counter<string>;

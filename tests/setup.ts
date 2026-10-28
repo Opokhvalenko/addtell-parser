@@ -32,7 +32,7 @@ export async function createTestApp(): Promise<FastifyInstance> {
 
   // Clear database before each test
   // Children before parents: line items reference creatives
-  await app.prisma.adEvent.deleteMany();
+  await app.prisma.analyticsEvent.deleteMany();
   await app.prisma.lineItem.deleteMany();
   await app.prisma.creative.deleteMany();
   await app.prisma.feedItem.deleteMany();

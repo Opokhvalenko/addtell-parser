@@ -63,9 +63,12 @@ export default fp(
       const checks: Record<string, { ok: boolean; error?: string }> = {};
 
       checks.db = await probePrisma(app);
-      checks.clickhouse = hasClickHouse(app)
-        ? await withTimeout(app.clickhouse.ping())
-        : { ok: false, error: "missing" };
+      // Only a store the app actually writes to is a dependency
+      if (app.config.ANALYTICS_STORE === "clickhouse") {
+        checks.clickhouse = hasClickHouse(app)
+          ? await withTimeout(app.clickhouse.ping())
+          : { ok: false, error: "missing" };
+      }
 
       const ok = Object.values(checks).every((c) => c.ok);
       const degraded = !ok && Object.values(checks).some((c) => c.ok);

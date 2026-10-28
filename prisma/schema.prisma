@@ -104,21 +104,23 @@ model Impression {
   @@index([uid, lineItemId, at])
 }
 
-model AdEvent {
+/// Ad analytics events (Prebid auctions, own ad server). A TTL index on `ts` is created at
+/// startup (Prisma cannot declare TTL indexes), so the collection never outgrows the database.
+model AnalyticsEvent {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  kind       String
-  uid        String?
-  lineItemId String?  @db.ObjectId
-  at         DateTime @default(now())
-  tookMs     Int?
-  extra      Json?
+  ts         DateTime
+  event      String
+  adapter    String
+  adUnitCode String
+  bidder     String
+  creativeId String
+  cpm        Float
+  cur        String
+  uid        String
+  sid        String
+  page       String
+  ref        String
+  adomain    String[]
 
-  @@index([kind, at])
-}
-
-model RequestCounter {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  key       String   @unique
-  value     Int      @default(0)
-  updatedAt DateTime @updatedAt
+  @@index([event, ts])
 }
