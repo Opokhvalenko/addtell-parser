@@ -3,11 +3,13 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
 import type { FastifyInstance } from "fastify";
+import { parseArticleByUrl } from "../src/modules/feed/articleService.js";
 import {
   assertSafeUrl,
   isPublicAddress,
   safeFetch,
   UnsafeUrlError,
+  UpstreamError,
 } from "../src/utils/safe-fetch.js";
 import { closeTestApp, createTestApp } from "./setup.js";
 
@@ -17,6 +19,12 @@ const SHORT_TIMEOUT_MS = 200;
 const TIMEOUT_TOLERANCE = 5;
 const DRIP_INTERVAL_MS = 50;
 const LOOPBACK = "127.0.0.1";
+
+const allowLoopbackOnly = (address: string) => address === LOOPBACK;
+
+/** The remote site failed (a 502 for the caller), not a refused URL (a 400). */
+const upstreamFailure = (message: RegExp) => (error: unknown) =>
+  error instanceof UpstreamError && message.test(error.message);
 
 describe("isPublicAddress", () => {
   const blocked = [
@@ -70,7 +78,6 @@ describe("assertSafeUrl", () => {
 describe("safeFetch", () => {
   let server: Server;
   let base = "";
-  const allowLoopbackOnly = (address: string) => address === LOOPBACK;
 
   before(async () => {
     server = createServer((req, res) => {
@@ -130,7 +137,7 @@ describe("safeFetch", () => {
         isAllowedAddress: allowLoopbackOnly,
         maxBytes: SMALL_LIMIT_BYTES,
       }),
-      /too large/,
+      upstreamFailure(/too large/),
     );
   });
 
@@ -141,7 +148,7 @@ describe("safeFetch", () => {
         maxBytes: SMALL_LIMIT_BYTES,
         timeoutMs: SHORT_TIMEOUT_MS,
       }),
-      /too large/,
+      upstreamFailure(/too large/),
     );
   });
 
@@ -151,7 +158,7 @@ describe("safeFetch", () => {
         isAllowedAddress: allowLoopbackOnly,
         maxBytes: SMALL_LIMIT_BYTES,
       }),
-      /too large/,
+      upstreamFailure(/too large/),
     );
   });
 
@@ -162,7 +169,7 @@ describe("safeFetch", () => {
         isAllowedAddress: allowLoopbackOnly,
         timeoutMs: SHORT_TIMEOUT_MS,
       }),
-      /timed out/,
+      upstreamFailure(/timed out/),
     );
     // Node's default agent would also time out, but only after 5 s
     assert.ok(Date.now() - startedAt < SHORT_TIMEOUT_MS * TIMEOUT_TOLERANCE);
@@ -175,7 +182,7 @@ describe("safeFetch", () => {
         isAllowedAddress: allowLoopbackOnly,
         timeoutMs: SHORT_TIMEOUT_MS,
       }),
-      /timed out/,
+      upstreamFailure(/timed out/),
     );
     assert.ok(Date.now() - startedAt < SHORT_TIMEOUT_MS * TIMEOUT_TOLERANCE);
   });
@@ -183,7 +190,7 @@ describe("safeFetch", () => {
   test("limits redirects", async () => {
     await assert.rejects(
       safeFetch(`${base}/loop`, { isAllowedAddress: allowLoopbackOnly, maxRedirects: 2 }),
-      /Too many redirects/,
+      upstreamFailure(/Too many redirects/),
     );
   });
 
@@ -220,6 +227,42 @@ describe("feed and article routes", () => {
       url: `/api/article?url=${encodeURIComponent("https://example.com/")}`,
     });
     assert.equal(res.statusCode, 401);
+  });
+
+  test("an error status from the site is an upstream failure (some sites answer bots 401)", async () => {
+    const site = createServer((_req, res) => {
+      res.writeHead(401);
+      res.end("bots not allowed");
+    });
+    await new Promise<void>((resolve) => site.listen(0, LOOPBACK, resolve));
+    const { port } = site.address() as AddressInfo;
+    try {
+      await assert.rejects(
+        parseArticleByUrl(app, `http://${LOOPBACK}:${port}/story`, {
+          isAllowedAddress: allowLoopbackOnly,
+        }),
+        upstreamFailure(/401/),
+      );
+    } finally {
+      site.close();
+    }
+  });
+
+  test("/api/article answers 502 when the site cannot be reached, without its error text", async () => {
+    const register = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: { email: "upstream@example.com", password: "password-123" },
+    });
+    const token = register.cookies.find((c) => c.name === "token")?.value ?? "";
+    // `.invalid` never resolves (RFC 2606): a failure of the source, not of the request
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/article?url=${encodeURIComponent("https://no-such-site.invalid/story")}`,
+      headers: { cookie: `token=${token}` },
+    });
+    assert.equal(res.statusCode, 502);
+    assert.deepEqual(res.json(), { error: "Bad Gateway", statusCode: 502 });
   });
 
   test("/api/article refuses internal addresses for a signed-in user", async () => {

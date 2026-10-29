@@ -32,12 +32,16 @@ export default fp(
           : SERVER_ERROR;
 
       if (statusCode >= SERVER_ERROR) {
-        request.log.error(
+        // A route that answers 502/503/504 on purpose (an upstream failed) is not a bug here
+        const deliberate = statusCode !== SERVER_ERROR;
+        request.log[deliberate ? "warn" : "error"](
           { err: error, url: request.url, method: request.method },
-          "Unhandled error",
+          deliberate ? "Dependency error" : "Unhandled error",
         );
-        // Internal details (stack, upstream messages, hostnames) stay in the logs
-        return reply.code(statusCode).send({ error: "Internal Server Error", statusCode });
+        // Only the status text: details (stack, upstream messages, hostnames) stay in the logs
+        return reply
+          .code(statusCode)
+          .send({ error: STATUS_CODES[statusCode] ?? STATUS_CODES[SERVER_ERROR], statusCode });
       }
 
       request.log.warn({ statusCode, url: request.url, msg: err.message }, "Client error");

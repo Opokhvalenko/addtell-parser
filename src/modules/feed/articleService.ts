@@ -2,7 +2,13 @@ import { type Cheerio, type CheerioAPI, load } from "cheerio";
 import type { AnyNode, Element } from "domhandler";
 import { isTag } from "domutils";
 import type { FastifyInstance } from "fastify";
-import { type SafeFetchResult, safeFetch, UnsafeUrlError } from "../../utils/safe-fetch.js";
+import {
+  type SafeFetchOptions,
+  type SafeFetchResult,
+  safeFetch,
+  UnsafeUrlError,
+  UpstreamError,
+} from "../../utils/safe-fetch.js";
 
 const ARTICLE_ACCEPT = "text/html,application/xhtml+xml";
 
@@ -168,6 +174,8 @@ function pickMainContainer($: CheerioAPI): Cheerio<AnyNode> | null {
 export async function parseArticleByUrl(
   app: FastifyInstance,
   inputUrl: string,
+  /** Tests point the fetch at a local server; the route always uses the defaults. */
+  fetchOptions: Omit<SafeFetchOptions, "accept"> = {},
 ): Promise<ParsedArticle> {
   const startedAt = Date.now();
   const baseUrl = new URL(inputUrl);
@@ -177,16 +185,17 @@ export async function parseArticleByUrl(
   // SSRF guard: the URL comes from the user
   let res: SafeFetchResult;
   try {
-    res = await safeFetch(inputUrl, { accept: ARTICLE_ACCEPT });
+    res = await safeFetch(inputUrl, { ...fetchOptions, accept: ARTICLE_ACCEPT });
   } catch (error) {
     if (error instanceof UnsafeUrlError) throw error;
     const errorMessage = error instanceof Error ? error.message : String(error);
-    app.log.error({ url: inputUrl, error: errorMessage }, "article: network error");
-    throw new Error("Failed to fetch article");
+    app.log.warn({ url: inputUrl, error: errorMessage }, "article: fetch failed");
+    // DNS failure, refused connection, timeout, oversized page: the site, not the caller
+    throw new UpstreamError(errorMessage);
   }
   if (res.status < 200 || res.status >= 300) {
-    app.log.error({ url: inputUrl, status: res.status }, "article: fetch failed");
-    throw new Error(`Upstream responded ${res.status}`);
+    app.log.warn({ url: inputUrl, status: res.status }, "article: upstream status");
+    throw new UpstreamError(`Upstream responded ${res.status}`);
   }
 
   const htmlRaw = res.body;

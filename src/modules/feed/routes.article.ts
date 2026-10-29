@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { UnsafeUrlError } from "../../utils/safe-fetch.js";
+import { UnsafeUrlError, UpstreamError } from "../../utils/safe-fetch.js";
 import { parseArticleByUrl } from "./articleService.js";
 import { ArticleQuerySchema } from "./schemas.js";
 
@@ -15,7 +15,9 @@ const routes: FastifyPluginAsync = async (app) => {
         return await parseArticleByUrl(app, url);
       } catch (error) {
         if (error instanceof UnsafeUrlError) throw app.httpErrors.badRequest(error.message);
-        throw new Error("Failed to parse article");
+        // The site failed, not the caller; its own error (hostnames, statuses) stays in the log
+        if (error instanceof UpstreamError) throw app.httpErrors.badGateway(error.message);
+        throw error;
       }
     },
   );

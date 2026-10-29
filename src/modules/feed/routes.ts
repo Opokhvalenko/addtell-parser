@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 
 import { normalizeError } from "../../utils/errors.js";
+import { UpstreamError } from "../../utils/safe-fetch.js";
 import { getOrParseFeedService } from "./feedService.js";
 import articleRoutes from "./routes.article.js";
 import {
@@ -80,6 +81,8 @@ const feedRoutes: FastifyPluginAsync = async (app) => {
       } catch (e: unknown) {
         const err = normalizeError(e);
         app.log.error({ url, errName: err.name, errMsg: err.message }, "GET /feed: failed");
+        // The source is down and nothing is cached: a gateway error, not a bug of this server
+        if (e instanceof UpstreamError) throw app.httpErrors.badGateway(err.message);
         throw new Error("Failed to fetch feed");
       }
     },
