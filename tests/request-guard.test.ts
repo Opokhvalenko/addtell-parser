@@ -64,8 +64,13 @@ describe("request guard", () => {
   });
 
   test("public static files are served without a session", async () => {
-    const res = await app.inject({ method: "GET", url: "/assets/tw-embed.css" });
+    const res = await app.inject({ method: "GET", url: "/public/assets/tw-embed.css" });
     assert.equal(res.statusCode, 200);
+    // The old copy of the same folder at the root is gone: one mount, one path
+    assert.equal(
+      (await app.inject({ method: "GET", url: "/assets/tw-embed.css" })).statusCode,
+      404,
+    );
   });
 
   test("a prefix of a public route does not make a lookalike path public", async () => {
@@ -172,6 +177,15 @@ describe("request guard", () => {
         401,
         "other accounts keep their own quota",
       );
+      // No second mount of the auth routes with its own quota
+      const unprefixed = await limited.inject({
+        method: "POST",
+        url: "/auth/login",
+        remoteAddress: RENDER_PROXY_IP,
+        headers: { "x-forwarded-for": "198.51.100.97" },
+        payload: { email: "victim@example.com", password: "wrong-password-1" },
+      });
+      assert.equal(unprefixed.statusCode, 404, "auth routes live only under /api/auth");
       // Look-alike spellings (KELVIN SIGN, dotted İ) are not emails here: no separate quota
       for (const lookAlike of ["victim@exampl\u212A.com", "v\u0130ctim@example.com"]) {
         assert.equal((await login(lookAlike, "198.51.100.98")).statusCode, 400, lookAlike);

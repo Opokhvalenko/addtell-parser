@@ -3,9 +3,9 @@ import authRoutes from "../modules/auth/routes.js";
 
 export default fp(
   async (app) => {
-    await app.register(authRoutes, { prefix: "/auth" });
+    // One mount: a second copy of the routes would also get its own login limits, doubling the
+    // attempts anyone can make on an account
     await app.register(authRoutes, { prefix: "/api/auth" });
-    app.log.info("Auth routes mounted at /auth and /api/auth");
   },
   { name: "auth-routes", dependencies: ["jwt"] },
 );

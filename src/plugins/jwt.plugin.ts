@@ -68,7 +68,7 @@ export default fp(
      * `config: { public: true }`. The only other exceptions are the static file mounts
      * (public assets by design — a missing file answers 404) and the API docs.
      */
-    const PUBLIC_STATIC_ROUTES = new Set(["/*", "/public/*", "/uploads/*"]);
+    const PUBLIC_STATIC_ROUTES = new Set(["/public/*", "/uploads/*"]);
     const DOCS_ROUTE = "/docs";
     const isDocsRoute = (route: string) =>
       route === DOCS_ROUTE || route.startsWith(`${DOCS_ROUTE}/`);

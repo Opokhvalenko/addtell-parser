@@ -23,7 +23,6 @@ export default fp(
         fastify.log.error({ err }, "Prisma disconnect failed");
       }
     });
-    fastify.pluginLoaded?.("prisma");
   },
   { name: "prisma" },
 );

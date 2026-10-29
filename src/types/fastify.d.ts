@@ -1,6 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { PrismaClient } from "@prisma/client";
-import type { CronStatus } from "../cron/types";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Registry, Counter } from "prom-client";
 import type { Config } from "../config/schema";
@@ -16,10 +15,6 @@ declare module "fastify" {
       ingestCounter: Counter<string>;
     };
     prisma: PrismaClient;
-
-    pluginLoaded?(pluginName: string): void;
-    cronFeedsRun?(onlyUrl?: string): Promise<void>;
-    cronFeedsStatus?(): CronStatus;
 
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 
@@ -44,9 +39,5 @@ declare module "fastify" {
     cookies: Record<string, string | undefined>;
     uid?: string;
     user?: { id: string; email?: string };
-
-    auditStartTime?: number;
-    auditIP?: string;
-    auditUserAgent?: string;
   }
 }
