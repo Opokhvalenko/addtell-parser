@@ -11,6 +11,12 @@ export const RegisterBodySchema = Type.Object(
 export type RegisterBody = Static<typeof RegisterBodySchema>;
 export const LoginBodySchema = RegisterBodySchema;
 export type LoginBody = Static<typeof LoginBodySchema>;
+/**
+ * An empty JSON object, required: a form on another site can POST `text/plain` or no body at
+ * all, but not `application/json` — without this, any page could sign its visitors into the
+ * demo account (login CSRF).
+ */
+export const DemoBodySchema = Type.Object({}, { additionalProperties: false });
 
 /** Tokens live only in httpOnly cookies — never in a response body JavaScript could read. */
 export const SessionUserSchema = Type.Object(

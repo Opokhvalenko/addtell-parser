@@ -60,6 +60,9 @@ export const EnvSchema = {
     AUTH_RATE_LIMIT_MAX: { type: "integer", minimum: 1 },
     AUTH_EMAIL_RATE_LIMIT_MAX: { type: "integer", minimum: 1 },
     TRUST_PROXY_HOPS: { type: "integer", minimum: 0 },
+    // The shared demo account `POST /api/auth/demo` signs into without a password. Unset or
+    // empty: no demo (an empty value left in the host's settings must not stop the server)
+    DEMO_ACCOUNT_EMAIL: { type: "string", anyOf: [{ format: "email" }, { maxLength: 0 }] },
   },
   required: ["DATABASE_URL", "JWT_SECRET", "COOKIE_SECRET"],
   additionalProperties: false,

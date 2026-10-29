@@ -86,3 +86,31 @@ export async function loginUser(
   if (!user || !isValid) throw new InvalidCredentialsError();
   return { id: user.id, email: user.email };
 }
+
+/**
+ * Live sessions kept for the shared demo account; the oldest go first. Anyone can start one
+ * without a password, so without a cap every click would add a refresh token for a week.
+ */
+const DEMO_SESSIONS_KEPT = 100;
+
+/**
+ * The demo account named by `DEMO_ACCOUNT_EMAIL`, or null when no demo is configured. Only an
+ * account created for the demo belongs there: whoever opens the site can act as it.
+ */
+export async function findDemoUser(app: FastifyInstance): Promise<SessionUser | null> {
+  const email = (app.config as { DEMO_ACCOUNT_EMAIL?: string }).DEMO_ACCOUNT_EMAIL;
+  if (!email) return null;
+  const user = await findUserByEmail(app, email);
+  return user ? { id: user.id, email: user.email } : null;
+}
+
+export async function trimDemoSessions(app: FastifyInstance, userId: string): Promise<void> {
+  const stale = await app.prisma.refreshToken.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    skip: DEMO_SESSIONS_KEPT,
+    select: { id: true },
+  });
+  if (stale.length === 0) return;
+  await app.prisma.refreshToken.deleteMany({ where: { id: { in: stale.map((t) => t.id) } } });
+}
