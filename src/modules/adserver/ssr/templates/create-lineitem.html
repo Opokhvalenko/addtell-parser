@@ -8,6 +8,10 @@
     :root { color-scheme: light dark; }
     html, body { margin: 0; background: transparent !important; }
   </style>
+  <!-- Also at document level: Tailwind v4 declares its variables with @property, and browsers
+       ignore @property inside a shadow root; without this, gradients (the submit button) and
+       shadows have no value in the form below -->
+  <link rel="stylesheet" href="/public/assets/tw-embed.css?v=4" />
 </head>
 <body>
   <div id="li-form-root"></div>
@@ -25,11 +29,6 @@
       const tw = document.createElement('link');
       tw.rel = 'stylesheet';
       tw.href = '/public/assets/tw-embed.css?v=4';
-      tw.onerror = () => {
-        const s = document.createElement('style');
-        s.textContent = '@import "/tailwind.css";';
-        shadow.appendChild(s);
-      };
       shadow.appendChild(tw);
 
       // Override styles to match the main app's glass-morphism design
