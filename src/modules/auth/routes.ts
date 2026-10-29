@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { authRateLimit, loginPerEmailLimit } from "../../plugins/rate-limit.plugin.js";
 import {
+  DemoBodySchema,
   type LoginBody,
   LoginBodySchema,
   type RegisterBody,
@@ -9,10 +10,12 @@ import {
 } from "./schemas.js";
 import {
   EmailTakenError,
+  findDemoUser,
   InvalidCredentialsError,
   loginUser,
   normalizeEmail,
   registerUser,
+  trimDemoSessions,
   warmUpLoginTiming,
 } from "./service.js";
 import {
@@ -72,6 +75,23 @@ const routes: FastifyPluginAsync = async (app) => {
         if (error instanceof InvalidCredentialsError) return reply.unauthorized();
         throw error;
       }
+    },
+  );
+
+  // The demo button of the site: a session of the configured demo account, no password. Its
+  // password stays private, so failed logins cannot lock recruiters out of the demo
+  app.post(
+    "/demo",
+    {
+      config: { public: true, rateLimit: authLimit },
+      schema: { body: DemoBodySchema, response: { 200: SessionUserSchema } },
+    },
+    async (_req, reply) => {
+      const demo = await findDemoUser(app);
+      if (!demo) return reply.notFound();
+      await startSession(app, reply, demo);
+      await trimDemoSessions(app, demo.id);
+      return demo;
     },
   );
 

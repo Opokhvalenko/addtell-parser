@@ -68,6 +68,8 @@ APP_ORIGIN=http://localhost:5173
 # Optional
 CRON_ENABLE=true
 CRON_FEEDS_SCHEDULE=*/10 * * * *
+# Demo button of the site: an account created only for the demo, signed into without a password
+DEMO_ACCOUNT_EMAIL=demo@example.com
 # Pages that may embed /create-lineitem (default 'self': the site embeds it through its own domain)
 FRAME_ANCESTORS='self'
 # OpenTelemetry: nothing is exported unless one of the standard variables is set, e.g.
@@ -85,6 +87,7 @@ See `.env.example` for all available options.
 - `POST /api/auth/register` — create user (Argon2 hash)
 - `POST /api/auth/login` — login (JWT in HttpOnly cookie)
 - `POST /api/auth/logout` — clear session
+- `POST /api/auth/demo` — session of the `DEMO_ACCOUNT_EMAIL` account (404 when not configured); at most 100 live demo sessions
 - `GET /api/auth/me` — current user (requires auth)
 
 ### Feed
