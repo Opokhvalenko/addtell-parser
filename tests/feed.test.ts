@@ -38,6 +38,30 @@ describe("Feed module", () => {
     );
   });
 
+  test("GET /api/feed answers 502 when a configured source fails and nothing is cached", async () => {
+    const sources = [
+      "https://feed.invalid/rss", // never resolves (RFC 2606)
+      "http://127.0.0.1:1/rss", // an address the fetch guard refuses
+    ];
+    const previous = process.env.FEEDS_SOURCES;
+    process.env.FEEDS_SOURCES = sources.join(",");
+    const withSources = await createTestApp();
+    if (previous === undefined) delete process.env.FEEDS_SOURCES;
+    else process.env.FEEDS_SOURCES = previous;
+    try {
+      for (const source of sources) {
+        const response = await withSources.inject({
+          method: "GET",
+          url: `/api/feed?url=${encodeURIComponent(source)}`,
+        });
+        assert.equal(response.statusCode, 502, source);
+        assert.deepEqual(response.json(), { error: "Bad Gateway", statusCode: 502 });
+      }
+    } finally {
+      await closeTestApp(withSources);
+    }
+  });
+
   test("GET /api/feed rejects a malformed URL", async () => {
     const response = await app.inject({ method: "GET", url: "/api/feed?url=invalid-url" });
     assert.equal(response.statusCode, 400);

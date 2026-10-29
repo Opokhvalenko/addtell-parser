@@ -58,6 +58,7 @@ export const EnvSchema = {
     RATE_LIMIT_MAX: { type: "integer", minimum: 1 },
     RATE_LIMIT_WINDOW: { type: "string" },
     AUTH_RATE_LIMIT_MAX: { type: "integer", minimum: 1 },
+    AUTH_EMAIL_RATE_LIMIT_MAX: { type: "integer", minimum: 1 },
     TRUST_PROXY_HOPS: { type: "integer", minimum: 0 },
   },
   required: ["DATABASE_URL", "JWT_SECRET", "COOKIE_SECRET"],

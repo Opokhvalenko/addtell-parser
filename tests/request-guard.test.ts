@@ -141,6 +141,46 @@ describe("request guard", () => {
     }
   });
 
+  test("login is limited per account: new client addresses do not add attempts", async () => {
+    // Through the site, every Vercel egress address has its own per-IP quota
+    const env = { AUTH_RATE_LIMIT_MAX: "1000", AUTH_EMAIL_RATE_LIMIT_MAX: String(TEST_AUTH_LIMIT) };
+    const previous = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
+    Object.assign(process.env, env);
+    const limited = await createTestApp();
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    const login = (email: string, clientIp: string) =>
+      limited.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        remoteAddress: RENDER_PROXY_IP,
+        headers: { "x-forwarded-for": clientIp },
+        payload: { email, password: "wrong-password-1" },
+      });
+    try {
+      for (let i = 0; i < TEST_AUTH_LIMIT; i++) {
+        assert.equal((await login("victim@example.com", `198.51.100.${i}`)).statusCode, 401);
+      }
+      // Another address and another spelling of the same account: still the same quota
+      const blocked = await login("Victim@Example.com", "198.51.100.99");
+      assert.equal(blocked.statusCode, 429, "the account is limited, not the address");
+      assert.ok(blocked.headers["retry-after"]);
+      assert.equal(
+        (await login("other@example.com", "198.51.100.0")).statusCode,
+        401,
+        "other accounts keep their own quota",
+      );
+      // Look-alike spellings (KELVIN SIGN, dotted İ) are not emails here: no separate quota
+      for (const lookAlike of ["victim@exampl\u212A.com", "v\u0130ctim@example.com"]) {
+        assert.equal((await login(lookAlike, "198.51.100.98")).statusCode, 400, lookAlike);
+      }
+    } finally {
+      await closeTestApp(limited);
+    }
+  });
+
   test("server errors do not leak internal messages from any plugin's routes", async () => {
     // The real app, not a bare instance: a plugin registered before the error handler keeps
     // Fastify's default one, which sends `message` and `code` to the client

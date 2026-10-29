@@ -21,6 +21,17 @@ export class UnsafeUrlError extends Error {
   }
 }
 
+/**
+ * The URL was allowed, but the remote site did not give a usable answer (timeout, too large,
+ * too many redirects). The caller's request was fine: a gateway error, not a client error.
+ */
+export class UpstreamError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UpstreamError";
+  }
+}
+
 export type SafeFetchResult = { status: number; contentType: string; body: string; url: string };
 
 export type SafeFetchOptions = {
@@ -147,7 +158,7 @@ function requestOnce(
       },
       (res) => {
         if (Number(res.headers["content-length"] ?? 0) > opts.maxBytes) {
-          req.destroy(new UnsafeUrlError("Response is too large"));
+          req.destroy(new UpstreamError("Response is too large"));
           return;
         }
         let size = 0;
@@ -155,7 +166,7 @@ function requestOnce(
         res.on("data", (chunk: Buffer) => {
           size += chunk.length;
           if (size > opts.maxBytes) {
-            req.destroy(new UnsafeUrlError("Response is too large"));
+            req.destroy(new UpstreamError("Response is too large"));
             return;
           }
           chunks.push(chunk);
@@ -170,7 +181,7 @@ function requestOnce(
     // A total deadline, not an idle timeout: an upstream that sends one byte at a time
     // would otherwise keep the connection (and the request) alive indefinitely
     const deadline = setTimeout(
-      () => req.destroy(new UnsafeUrlError("Upstream timed out")),
+      () => req.destroy(new UpstreamError("Upstream timed out")),
       opts.timeoutMs,
     );
     req.on("error", (error) => {
@@ -209,5 +220,5 @@ export async function safeFetch(
       url: url.toString(),
     };
   }
-  throw new UnsafeUrlError("Too many redirects");
+  throw new UpstreamError("Too many redirects");
 }

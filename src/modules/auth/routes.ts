@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { authRateLimit } from "../../plugins/rate-limit.plugin.js";
+import { authRateLimit, loginPerEmailLimit } from "../../plugins/rate-limit.plugin.js";
 import {
   type LoginBody,
   LoginBodySchema,
@@ -11,6 +11,7 @@ import {
   EmailTakenError,
   InvalidCredentialsError,
   loginUser,
+  normalizeEmail,
   registerUser,
   warmUpLoginTiming,
 } from "./service.js";
@@ -26,6 +27,10 @@ import {
 const routes: FastifyPluginAsync = async (app) => {
   await warmUpLoginTiming();
   const authLimit = authRateLimit(app);
+  // Runs after validation: the body is a valid LoginBody here
+  const perEmailLimit = loginPerEmailLimit(app, (req) =>
+    normalizeEmail((req.body as LoginBody).email),
+  );
 
   const readRefreshCookie = (raw: string | undefined): string | undefined => {
     if (!raw) return undefined;
@@ -55,6 +60,7 @@ const routes: FastifyPluginAsync = async (app) => {
     "/login",
     {
       config: { public: true, rateLimit: authLimit },
+      preHandler: perEmailLimit,
       schema: { body: LoginBodySchema, response: { 200: SessionUserSchema } },
     },
     async (req, reply) => {

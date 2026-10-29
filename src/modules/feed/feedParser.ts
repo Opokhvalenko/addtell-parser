@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import Parser from "rss-parser";
 import { normalizeError } from "../../utils/errors.js";
-import { safeFetch } from "../../utils/safe-fetch.js";
+import { safeFetch, UpstreamError } from "../../utils/safe-fetch.js";
 
 export type RssItem = {
   link: string;
@@ -23,7 +23,9 @@ export async function parseFeed(app: FastifyInstance, url: string) {
 
   try {
     const res = await safeFetch(url, { accept: FEED_ACCEPT });
-    if (res.status < 200 || res.status >= 300) throw new Error(`Upstream responded ${res.status}`);
+    if (res.status < 200 || res.status >= 300) {
+      throw new UpstreamError(`Upstream responded ${res.status}`);
+    }
     const feed = await parser.parseString(res.body);
     const count = Array.isArray(feed.items) ? feed.items.length : 0;
     app.log.info({ url, items: count, ms: Date.now() - startedAt }, "parseFeed: done");
@@ -31,6 +33,8 @@ export async function parseFeed(app: FastifyInstance, url: string) {
   } catch (err: unknown) {
     const e = normalizeError(err);
     app.log.warn({ url, errName: e.name, errMsg: e.message }, "parseFeed: failed");
-    throw err;
+    // Network failure, bad status, XML that is not a feed, even a redirect to a refused address:
+    // feeds come from the configured sources, so each of these is a problem of the source site
+    throw err instanceof UpstreamError ? err : new UpstreamError(e.message);
   }
 }

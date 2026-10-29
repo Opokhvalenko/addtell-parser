@@ -124,6 +124,7 @@ export async function getOrParseFeedService(app: FastifyInstance, url: string, f
   } catch (error: unknown) {
     const normalizedError = normalizeError(error);
     app.log.error({ url, error: normalizedError }, "Failed to get or parse feed");
-    throw normalizedError;
+    // The original error: callers tell an upstream failure from a bug by its class
+    throw error;
   }
 }
