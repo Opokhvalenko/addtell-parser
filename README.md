@@ -36,16 +36,12 @@ src/
 │   ├── adserver/         # Line items, bid auction, filtering pipeline
 │   │   ├── service/      # create, pick (auction), filters
 │   │   ├── pipeline/     # Filter chain: active, adType, floor, geo, size
-│   │   ├── repo/         # Data access (lineItem, creative, impression, stats)
+│   │   ├── repo/         # Data access (line items, impressions)
 │   │   └── ssr/          # Server-rendered pages
-│   ├── analytics/        # Event ingestion, ClickHouse writes
-│   ├── stats/            # Aggregation queries, CSV export
-│   ├── creatives/        # Ad creative management
-│   └── uploads/          # File upload handling
-├── plugins/              # 32 Fastify plugins (auth, jwt, cors, swagger, otel, etc.)
-├── cron/                 # Scheduled feed sync
-├── telemetry/            # OpenTelemetry setup (traces, metrics, logs)
-├── config/               # Env validation (Zod schema)
+│   └── analytics/        # Event ingestion and stats (MongoDB, optional ClickHouse)
+├── plugins/              # Fastify plugins (auth, jwt, cors, rate limits, headers, swagger, otel, schedule, …)
+├── telemetry/            # OpenTelemetry setup, exported only when configured (see below)
+├── config/               # Env validation (JSON Schema)
 └── utils/                # Shared utilities
 ```
 
@@ -70,9 +66,12 @@ COOKIE_SECRET=your-32-char-secret
 APP_ORIGIN=http://localhost:5173
 
 # Optional
-CLICKHOUSE_URL=http://127.0.0.1:8123
 CRON_ENABLE=true
 CRON_FEEDS_SCHEDULE=*/10 * * * *
+# Pages that may embed /create-lineitem (default 'self': the site embeds it through its own domain)
+FRAME_ANCESTORS='self'
+# OpenTelemetry: nothing is exported unless one of the standard variables is set, e.g.
+# OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example:4318 (or OTEL_TRACES_EXPORTER=console locally)
 ```
 
 See `.env.example` for all available options.
@@ -80,8 +79,7 @@ See `.env.example` for all available options.
 ## API Endpoints
 
 ### Health
-- `GET /health` — server status
-- `GET /health/db` — MongoDB health
+- `GET /health` — server and database status
 
 ### Auth
 - `POST /api/auth/register` — create user (Argon2 hash)
@@ -94,16 +92,14 @@ See `.env.example` for all available options.
 - `GET /api/article?url=...` — single article with sanitized HTML
 
 ### Ad Server
-- `POST /api/adserver/lineitems` — create ad line item (requires auth)
-- `POST /api/adserver/bid` — bid request (filtering pipeline)
-- `GET /api/beautiful-ad` — house ad endpoint
+- `POST /api/adserver/line-items` — create a line item (JSON, requires auth)
+- `POST /api/ads/lineitems` — the same from the "Create ad" form (multipart, optional image, requires auth)
+- `GET /api/bid?size=300x250&type=banner` — public: the best line item for a slot (filtering pipeline, frequency cap per visitor)
+- `GET /create-lineitem` — the server-rendered "Create ad" form (requires auth)
 
 ### Analytics
 - `POST /api/analytics/events` — public: a batch of up to 100 events (schema-validated, rate-limited per IP)
 - `GET /api/analytics/stats?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day,event,adapter&metrics=count,wins,cpmAvg` — requires a session, range ≤ 90 days
-
-### Uploads
-- `POST /api/upload` — upload creative (requires auth)
 
 ## Docker
 

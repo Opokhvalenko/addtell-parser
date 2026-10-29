@@ -2,7 +2,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-# deps (ставимо з devDeps, щоб був tailwindcss)
+# All dependencies: the build needs tailwindcss and typescript
 COPY package*.json ./
 RUN npm ci
 
@@ -10,15 +10,14 @@ RUN npm ci
 COPY prisma ./prisma
 RUN npx prisma generate
 
-# конфіги/код
+# Config and sources
 COPY tsconfig.json ./
 COPY src ./src
 
-# створимо публічну папку під CSS з tailwind
+# Output folder for the Tailwind CSS of the server-rendered pages
 RUN mkdir -p public/assets
 
-# якщо немає tailwind.config.js у репо — згенеруємо дефолтний
-# (покриває SSR-шаблони та будь-які *.ts(x)/*.js(x) у src)
+# Tailwind config for the server-rendered templates when the repository has none
 RUN [ -f tailwind.config.js ] || cat > tailwind.config.js <<'EOF'
 /** auto-generated in Docker build if missing */
 export default {
@@ -32,14 +31,14 @@ export default {
 };
 EOF
 
-# збірка (tsc + tailwind)
+# Build (tsc + tailwind)
 RUN npm run build
 
-# копіюємо SSR-шаблони у dist
+# The SSR templates are read at runtime from dist
 RUN mkdir -p dist/modules/adserver/ssr/templates \
  && cp -r src/modules/adserver/ssr/templates/*.html dist/modules/adserver/ssr/templates/
 
-# прибираємо dev-залежності перед переносом у рантайм
+# Only production dependencies go to the runtime image
 RUN npm prune --omit=dev
 
 
@@ -49,16 +48,21 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache libstdc++ openssl ca-certificates && update-ca-certificates
 
-# прод-залежності та артефакти
+# Read-only for the app: owned by root
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/public ./public
-
-# uploads (і віддача статики, якщо потрібно)
-RUN mkdir -p /app/uploads/creatives
+# Written at runtime (uploaded creatives, the feeds manifest): owned by the app user
+COPY --from=builder --chown=node:node /app/public ./public
+RUN mkdir -p /app/uploads/creatives && chown -R node:node /app/uploads
 VOLUME ["/app/uploads"]
 
+# Not root: a bug in the app or a dependency cannot change the image or the system
+USER node
+
 EXPOSE 3000
+# Marks a hung server unhealthy (docker ps, compose depends_on); Render uses its own check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- "http://127.0.0.1:${PORT:-3000}/health" > /dev/null || exit 1
 CMD ["node","dist/index.js"]

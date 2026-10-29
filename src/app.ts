@@ -76,7 +76,6 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register((await import("./plugins/health.plugin.js")).default);
   await app.register((await import("./plugins/security-headers.plugin.js")).default);
   await app.register((await import("./plugins/rate-limit.plugin.js")).default);
-  await app.register((await import("./plugins/audit-logging.plugin.js")).default);
 
   await app.register((await import("./plugins/jwt.plugin.js")).default);
   await app.register((await import("./plugins/cookie.plugin.js")).default);
@@ -87,11 +86,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     ignorePattern:
-      /^(error-handling|otel|health|security-headers|rate-limit|audit-logging|jwt|auth|clickhouse|analytics|cookie|swagger)\.plugin\.(js|mjs|cjs|ts|mts|cts)$/i,
+      /^(error-handling|otel|health|security-headers|rate-limit|jwt|auth|clickhouse|analytics|cookie|swagger)\.plugin\.(js|mjs|cjs|ts|mts|cts)$/i,
     encapsulate: true,
   });
-
-  await app.register((await import("./routes/beautiful-ad.js")).default, { prefix: "/api" });
 
   if (!isProd || process.env.PRINT_ROUTES === "1") {
     await app.ready();

@@ -2,69 +2,62 @@ import fp from "fastify-plugin";
 
 const UPLOADS_CSP = "default-src 'none'; img-src 'self'; sandbox";
 
+/** JSON, redirects, files: such a response may load or run nothing, and nothing may frame it. */
+const API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+
+/**
+ * The site embeds `/create-lineitem` through its own domain (a Vercel rewrite, the Vite proxy in
+ * development), so the framing page is same-origin. `FRAME_ANCESTORS` overrides it for a
+ * deployment where the frontend is on another origin.
+ */
+const DEFAULT_FRAME_ANCESTORS = "'self'";
+
+/**
+ * HTML of this server: inline scripts and styles of its own templates, nothing from elsewhere.
+ * `extra` adds what one kind of page needs on top.
+ */
+function htmlCsp(frameAncestors: string, extra: { imgSrc: string; frameSrc?: string }): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    `img-src ${extra.imgSrc}`,
+    "connect-src 'self'",
+    ...(extra.frameSrc ? [`frame-src ${extra.frameSrc}`] : []),
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    `frame-ancestors ${frameAncestors}`,
+    "upgrade-insecure-requests",
+  ].join("; ");
+}
+
 export default fp(
   async (app) => {
+    const configured = (app.config as { FRAME_ANCESTORS?: string }).FRAME_ANCESTORS?.trim();
+    const frameAncestors = configured || DEFAULT_FRAME_ANCESTORS;
+    // The line-item form previews a picked file (blob:), a pasted data URL, a remote creative
+    // image, and an HTML creative in a srcdoc frame
+    const pageCsp = htmlCsp(frameAncestors, {
+      imgSrc: "'self' data: blob: https:",
+      frameSrc: "'self'",
+    });
+    const docsCsp = htmlCsp(frameAncestors, { imgSrc: "'self' data: https:" });
+
     app.addHook("onSend", async (request, reply, _payload) => {
-      const cfg = app.config as typeof app.config & { FRAME_ANCESTORS?: string; NODE_ENV?: string };
-      const isProd = (cfg.NODE_ENV ?? process.env.NODE_ENV) === "production";
-
-      const devDefaults =
-        "'self' http://localhost:3000 http://127.0.0.1:3000 http://localhost:5173 http://127.0.0.1:5173";
-
-      const FRAME_ANCESTORS =
-        cfg.FRAME_ANCESTORS && cfg.FRAME_ANCESTORS.trim().length > 0
-          ? cfg.FRAME_ANCESTORS.trim()
-          : isProd
-            ? "'none'"
-            : devDefaults;
-
       const isLineItemPage = request.url.startsWith("/create-lineitem");
       const isTwEmbedCss = request.url.startsWith("/public/assets/tw-embed.css");
       const isDocs = request.url.startsWith("/docs");
-
-      const baseImgSrc = "img-src 'self' data: https: http:";
-      const imgSrc = isLineItemPage ? `${baseImgSrc} blob:` : baseImgSrc;
-
-      const defaultCsp = [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com",
-        imgSrc,
-        "connect-src 'self' https://www.google-analytics.com https://analytics.google.com",
-        "frame-src 'self' https://www.google.com",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-        `frame-ancestors ${FRAME_ANCESTORS}`,
-        "upgrade-insecure-requests",
-      ].join("; ");
-
-      const docsCsp = [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com",
-        "img-src 'self' data: https: http:",
-        "connect-src 'self'",
-        "frame-src 'self'",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-        `frame-ancestors ${FRAME_ANCESTORS}`,
-        "upgrade-insecure-requests",
-      ].join("; ");
+      const isHtml = String(reply.getHeader("content-type") ?? "").startsWith("text/html");
 
       // Uploaded creatives: even a mislabelled file can never run as a page on the API origin
       const isUpload = request.routeOptions?.url === "/uploads/*";
-      reply.header(
-        "Content-Security-Policy",
-        isUpload ? UPLOADS_CSP : isDocs ? docsCsp : defaultCsp,
-      );
+      const csp = isUpload ? UPLOADS_CSP : isDocs ? docsCsp : isHtml ? pageCsp : API_CSP;
+      reply.header("Content-Security-Policy", csp);
 
-      if (FRAME_ANCESTORS === "'none'") {
+      if (csp === API_CSP || frameAncestors === "'none'") {
         reply.header("X-Frame-Options", "DENY");
-      } else if (FRAME_ANCESTORS === "'self'") {
+      } else if (frameAncestors === "'self'") {
         reply.header("X-Frame-Options", "SAMEORIGIN");
       } else {
         reply.removeHeader("X-Frame-Options");
@@ -84,7 +77,8 @@ export default fp(
 
       reply.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
       reply.header("X-Content-Type-Options", "nosniff");
-      reply.header("X-XSS-Protection", "1; mode=block");
+      // The old XSS auditor is gone from browsers and could itself be abused: switched off
+      reply.header("X-XSS-Protection", "0");
       reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
       reply.header(
         "Permissions-Policy",
